@@ -34,7 +34,9 @@ func TestMapPar(t *testing.T) {
 				return items
 			}(),
 			mapper: func(i int) string {
-				defer parTracker.Track(t)()
+				parallelism, cleanup := parTracker.Track(t)
+				assert.LessOrEqual(t, parallelism, maxParallelism)
+				defer cleanup()
 				time.Sleep(50 * time.Millisecond) // simulate work
 				return strconv.Itoa(i)
 			},
@@ -51,7 +53,9 @@ func TestMapPar(t *testing.T) {
 			name:  "handles errors",
 			input: []int{1, 2, 3},
 			mapper: func(i int) string {
-				defer parTracker.Track(t)()
+				parallelism, cleanup := parTracker.Track(t)
+				assert.LessOrEqual(t, parallelism, maxParallelism)
+				defer cleanup()
 				time.Sleep(50 * time.Millisecond) // simulate work
 				return strconv.Itoa(i)
 			},
