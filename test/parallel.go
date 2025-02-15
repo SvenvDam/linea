@@ -3,8 +3,6 @@ package test
 import (
 	"sync"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 type ParallelTracker struct {
@@ -21,13 +19,12 @@ func NewParallelTracker(maxParallelism int) *ParallelTracker {
 	}
 }
 
-func (p *ParallelTracker) Track(t *testing.T) func() {
+func (p *ParallelTracker) Track(t *testing.T) (int, func()) {
 	p.mu.Lock()
 	p.currentParallelism++
-	assert.LessOrEqual(t, p.currentParallelism, p.maxParallelism)
 	p.mu.Unlock()
 
-	return func() {
+	return p.currentParallelism, func() {
 		p.mu.Lock()
 		p.currentParallelism--
 		p.mu.Unlock()

@@ -27,7 +27,9 @@ func TestFlatMapPar(t *testing.T) {
 			name:  "flattens and transforms items in parallel",
 			input: []int{1, 2, 3, 4},
 			mapper: func(i int) []string {
-				defer parTracker.Track(t)()
+				parallelism, cleanup := parTracker.Track(t)
+				assert.LessOrEqual(t, parallelism, maxParallelism)
+				defer cleanup()
 				time.Sleep(50 * time.Millisecond) // simulate work
 				if i%2 == 0 {
 					return []string{
@@ -49,7 +51,9 @@ func TestFlatMapPar(t *testing.T) {
 			name:  "handles empty input",
 			input: []int{},
 			mapper: func(i int) []string {
-				defer parTracker.Track(t)()
+				parallelism, cleanup := parTracker.Track(t)
+				assert.LessOrEqual(t, parallelism, maxParallelism)
+				defer cleanup()
 				t.Error("mapper should not be called for empty input")
 				return nil
 			},
@@ -60,7 +64,9 @@ func TestFlatMapPar(t *testing.T) {
 			name:  "handles mapper returning empty slices",
 			input: []int{1, 2, 3},
 			mapper: func(i int) []string {
-				defer parTracker.Track(t)()
+				parallelism, cleanup := parTracker.Track(t)
+				assert.LessOrEqual(t, parallelism, maxParallelism)
+				defer cleanup()
 				time.Sleep(50 * time.Millisecond) // simulate work
 				if i == 2 {
 					return []string{"middle"}
@@ -74,7 +80,9 @@ func TestFlatMapPar(t *testing.T) {
 			name:  "handles nil slices from mapper",
 			input: []int{1, 2},
 			mapper: func(i int) []string {
-				defer parTracker.Track(t)()
+				parallelism, cleanup := parTracker.Track(t)
+				assert.LessOrEqual(t, parallelism, maxParallelism)
+				defer cleanup()
 				time.Sleep(50 * time.Millisecond) // simulate work
 				if i == 1 {
 					return nil
