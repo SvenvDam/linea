@@ -1,3 +1,9 @@
+# Linea
+![GitHub Tag](https://img.shields.io/github/v/tag/svenvdam/linea)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/svenvdam/linea/ci.yaml)
+![Codecov](https://img.shields.io/codecov/c/github/svenvdam/linea)
+![GitHub License](https://img.shields.io/github/license/svenvdam/linea)
+
 Linea is a composable stream processing library for Go.
 
 It allows you to build data processing pipelines by connecting three main components:
