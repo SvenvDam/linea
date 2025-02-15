@@ -1,4 +1,4 @@
-// Package linea provides a composable streaming data processing library for Go.
+// Package linea provides a composable stream processing library for Go.
 //
 // Linea allows you to build data processing pipelines by connecting three main components:
 //   - Sources: Produce data items (e.g., from slices, channels)
