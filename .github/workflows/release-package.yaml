@@ -1,0 +1,40 @@
+name: Release package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Needed for pushing tags
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go
+      - uses: ./.github/actions/lint-test
+      - name: Validate and set version
+        run: |
+          VERSION=$(cat VERSION)
+          if ! [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Version must be in format vX.Y.Z (got: $VERSION)"
+            exit 1
+          fi
+          echo "Version to release: $VERSION"
+          echo "RELEASE_VERSION=$VERSION" >> $GITHUB_ENV
+      - name: Check if version tag exists
+        run: |
+          if git tag -l "$RELEASE_VERSION"; then
+            echo "Error: Tag $RELEASE_VERSION already exists"
+            exit 1
+          fi
+      - name: Release package
+        run: |
+          echo "Releasing package version $RELEASE_VERSION"
+          git tag "$RELEASE_VERSION"
+          git push origin "$RELEASE_VERSION"
+      - name: Verify package availability
+        run: |
+          # Wait a bit for the tag to be processed
+          sleep 10
+          # Try to list the package through proxy.golang.org
+          GOPROXY=https://proxy.golang.org go list -m $(go list -m)@$RELEASE_VERSION
