@@ -165,3 +165,112 @@ func SourceThroughFlowToSink3[I, O1, O2, O3, R any](
 	s3 := appendFlowToSource(s2, flow3)
 	return connectSourceToSink(s3, sink)
 }
+
+// SinkThroughFlow creates a new sink by prepending a flow transformation.
+// This allows for transforming data before it reaches the sink.
+//
+// Type Parameters:
+//   - I: Type of input items to the flow
+//   - O: Type of items after flow transformation (consumed by sink)
+//   - R: Type of result produced by the sink
+//
+// Parameters:
+//   - flow: The flow that transforms items from type I to O
+//   - sink: The sink consuming items of type O and producing result R
+//
+// Returns a new Sink that accepts items of type I and produces result R
+func SinkThroughFlow[I, O, R any](flow *Flow[I, O], sink *Sink[O, R]) *Sink[I, R] {
+	return prependFlowToSink(flow, sink)
+}
+
+// SinkThroughFlow2 creates a new sink by prepending two flows in sequence.
+// This is a convenience function that chains two transformations before a sink.
+//
+// Type Parameters:
+//   - I: Type of input items to first flow
+//   - O1: Type of items after first flow
+//   - O2: Type of items after second flow (consumed by sink)
+//   - R: Type of result produced by the sink
+//
+// Parameters:
+//   - flow1: First flow transforming I to O1
+//   - flow2: Second flow transforming O1 to O2
+//   - sink: The sink consuming O2 and producing result R
+//
+// Returns a new Sink that accepts items of type I and produces result R
+func SinkThroughFlow2[I, O1, O2, R any](
+	flow1 *Flow[I, O1],
+	flow2 *Flow[O1, O2],
+	sink *Sink[O2, R],
+) *Sink[I, R] {
+	merged := MergeFlows(flow1, flow2)
+	return prependFlowToSink(merged, sink)
+}
+
+// SinkThroughFlow3 creates a new sink by prepending three flows in sequence.
+// This is a convenience function that chains three transformations before a sink.
+//
+// Type Parameters:
+//   - I: Type of input items to first flow
+//   - O1: Type of items after first flow
+//   - O2: Type of items after second flow
+//   - O3: Type of items after third flow (consumed by sink)
+//   - R: Type of result produced by the sink
+//
+// Parameters:
+//   - flow1: First flow transforming I to O1
+//   - flow2: Second flow transforming O1 to O2
+//   - flow3: Third flow transforming O2 to O3
+//   - sink: The sink consuming O3 and producing result R
+//
+// Returns a new Sink that accepts items of type I and produces result R
+func SinkThroughFlow3[I, O1, O2, O3, R any](
+	flow1 *Flow[I, O1],
+	flow2 *Flow[O1, O2],
+	flow3 *Flow[O2, O3],
+	sink *Sink[O3, R],
+) *Sink[I, R] {
+	merged := MergeFlows3(flow1, flow2, flow3)
+	return prependFlowToSink(merged, sink)
+}
+
+// MergeFlows creates a new flow by combining two flows in sequence.
+// This allows for creating more complex transformations by combining simpler ones.
+//
+// Type Parameters:
+//   - I: Type of input items to first flow
+//   - O1: Type of items after first flow
+//   - O2: Type of items after second flow
+//
+// Parameters:
+//   - flow1: First flow transforming I to O1
+//   - flow2: Second flow transforming O1 to O2
+//
+// Returns a new Flow that transforms items from type I to O2
+func MergeFlows[I, O1, O2 any](flow1 *Flow[I, O1], flow2 *Flow[O1, O2]) *Flow[I, O2] {
+	return connectFlows(flow1, flow2)
+}
+
+// MergeFlows3 creates a new flow by combining three flows in sequence.
+// This is a convenience function that chains three transformations together.
+//
+// Type Parameters:
+//   - I: Type of input items to first flow
+//   - O1: Type of items after first flow
+//   - O2: Type of items after second flow
+//   - O3: Type of items after third flow
+//
+// Parameters:
+//   - flow1: First flow transforming I to O1
+//   - flow2: Second flow transforming O1 to O2
+//   - flow3: Third flow transforming O2 to O3
+//
+// Returns a new Flow that transforms items from type I to O3
+func MergeFlows3[I, O1, O2, O3 any](
+	flow1 *Flow[I, O1],
+	flow2 *Flow[O1, O2],
+	flow3 *Flow[O2, O3],
+) *Flow[I, O3] {
+	f1 := connectFlows(flow1, flow2)
+	return connectFlows(f1, flow3)
+}

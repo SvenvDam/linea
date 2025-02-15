@@ -46,7 +46,7 @@ func TestDrain(t *testing.T) {
 
 			res := <-resChan
 			assert.True(t, res.Ok)
-			assert.Greater(t, len(res.Value), 0)
+			assert.NotEmpty(t, res.Value)
 
 			_, ok := <-resChan
 			assert.False(t, ok)
