@@ -65,9 +65,10 @@ func WithFlowBufSize(size int) FlowOption {
 //   - Managing any resources it creates
 //
 // Parameters:
-//   - opts: Optional FlowOption functions to configure the flow
 //   - process: A function that defines how to transform input items to output items.
-//     It receives:
+//   - opts: Optional FlowOption functions to configure the flow
+//
+// The proccess function receives the following arguments:
 //   - ctx: A context for cancellation
 //   - in: Input channel receiving items of type I
 //   - out: Output channel for sending transformed items

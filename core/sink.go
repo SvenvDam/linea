@@ -28,8 +28,10 @@ type Sink[I, R any] struct {
 // NewSink creates a new Sink that processes items using the provided process function.
 //
 // Parameters:
-//   - process: A function that takes a context, input channel, and cancel function,
-//     processes the incoming items, and returns a result of type R. It receives:
+//   - process: A function that defines how to process the incoming items.
+//     It returns a result of type R when done processing.
+//
+// The process function receives the following arguments:
 //   - ctx: A context for cancellation
 //   - in: Input channel receiving items of type I
 //   - cancel: Function to cancel the sink's context
