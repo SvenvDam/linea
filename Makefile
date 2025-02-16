@@ -4,7 +4,7 @@ fmt:
 
 .PHONY: test
 test:
-	go test -v ./...
+	go test -v -cover ./...
 
 .PHONY: tidy
 tidy:
