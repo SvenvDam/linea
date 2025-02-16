@@ -23,9 +23,7 @@ func Flatten[I any](
 ) *core.Flow[[]I, I] {
 	return core.NewFlow(func(ctx context.Context, in <-chan []I, out chan<- I, cancel context.CancelFunc) {
 		util.ProcessLoop(ctx, in, out, func(items []I) {
-			for _, item := range items {
-				util.Send(ctx, item, out)
-			}
+			util.SendMany(ctx, items, out)
 		}, func() {})
 	}, opts...)
 }

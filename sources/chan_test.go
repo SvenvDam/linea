@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/svenvdam/linea/core"
+	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/test"
 )
@@ -41,7 +41,7 @@ func TestChan(t *testing.T) {
 			}()
 
 			seen := make([]int, 0)
-			stream := core.SourceThroughFlowToSink(
+			stream := compose.SourceThroughFlowToSink(
 				Chan(ch),
 				test.CaptureItems(&seen),
 				sinks.Noop[int](),

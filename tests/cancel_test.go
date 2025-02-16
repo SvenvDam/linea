@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/svenvdam/linea/core"
+	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/sources"
 )
@@ -51,7 +51,7 @@ func TestCancel(t *testing.T) {
 			ctx := context.Background()
 			ctx = tt.setup(ctx)
 
-			stream := core.SourceToSink(
+			stream := compose.SourceToSink(
 				sources.Repeat(1),
 				sinks.Noop[int](),
 			)

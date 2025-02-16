@@ -60,9 +60,7 @@ func NewSource[O any](
 	generate func(ctx context.Context) <-chan O,
 	opts ...SourceOption,
 ) *Source[O] {
-	cfg := &sourceConfig{
-		bufSize: defaultBufSize,
-	}
+	cfg := &sourceConfig{}
 
 	// Apply all options
 	for _, opt := range opts {

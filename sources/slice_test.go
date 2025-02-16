@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/svenvdam/linea/core"
+	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/test"
 )
@@ -33,7 +33,7 @@ func TestSlice(t *testing.T) {
 			ctx := context.Background()
 
 			seen := make([]int, 0)
-			stream := core.SourceThroughFlowToSink(
+			stream := compose.SourceThroughFlowToSink(
 				Slice(tt.elements),
 				test.CaptureItems(&seen),
 				sinks.Noop[int](),

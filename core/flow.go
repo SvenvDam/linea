@@ -83,9 +83,7 @@ func NewFlow[I, O any](
 	process func(ctx context.Context, in <-chan I, out chan<- O, cancel context.CancelFunc),
 	opts ...FlowOption,
 ) *Flow[I, O] {
-	cfg := &flowConfig{
-		bufSize: defaultBufSize,
-	}
+	cfg := &flowConfig{}
 
 	// Apply all options
 	for _, opt := range opts {
