@@ -47,8 +47,10 @@ type Source[O any] struct {
 // NewSource creates a new Source that produces items using the provided generate function.
 //
 // Parameters:
-//   - generate: A function that takes a context and returns a channel of type O
 //   - opts: Optional SourceOption functions to configure the source
+//   - generate: A function that takes a context and returns a channel of type O.
+//     It receives:
+//   - ctx: A context for cancellation
 //
 // Type Parameters:
 //   - O: The type of items produced by this source

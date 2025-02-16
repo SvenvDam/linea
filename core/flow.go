@@ -51,13 +51,26 @@ func WithFlowBufSize(size int) FlowOption {
 	}
 }
 
-// NewFlow creates a new Flow that transforms input items to output items using the provided process function.
+// NewFlow creates a new Flow that transforms input items to output items using
+// the provided process function.
+//
+// The Flow automatically handles:
+//   - Goroutine lifecycle management
+//   - Context cancellation propagation
+//   - Channel cleanup on completion
+//
+// The process function is responsible for:
+//   - Transforming and sending output items
+//   - Handling its own cleanup in onDone
+//   - Managing any resources it creates
 //
 // Parameters:
+//   - opts: Optional FlowOption functions to configure the flow
 //   - process: A function that defines how to transform input items to output items.
 //     It receives:
 //   - ctx: A context for cancellation
 //   - in: Input channel receiving items of type I
+//   - out: Output channel for sending transformed items
 //   - cancel: Function to cancel the flow's context
 //
 // Type Parameters:

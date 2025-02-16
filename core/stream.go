@@ -36,15 +36,16 @@ type Stream[R any] struct {
 	)
 }
 
-// newStream creates a new Stream with the provided run function and result channel.
+// newStream creates a new Stream with the provided setup function.
 //
 // Parameters:
-//   - setup: Function that sets up and coordinates the stream execution
+//   - setup: Function that sets up and coordinates the stream execution,
+//     including goroutine management and result channel initialization
 //
 // Type Parameters:
 //   - R: The type of the final result produced by the stream
 //
-// Returns a configured Stream ready to be run
+// Returns a configured Stream ready to be run.
 func newStream[R any](
 	setup func(
 		ctx context.Context,
@@ -125,6 +126,8 @@ func (s *Stream[R]) Cancel() {
 
 // Drain signals the stream to stop accepting new items and process only the
 // remaining items in the pipeline. This performs a graceful shutdown of the stream.
+// This method returns immediately and does not block - to wait for all items to be
+// processed, continue reading from the stream's result channel until it closes.
 func (s *Stream[R]) Drain() {
 	if s.isRunning.Load() {
 		close(s.drain)

@@ -29,7 +29,10 @@ type Sink[I, R any] struct {
 //
 // Parameters:
 //   - process: A function that takes a context, input channel, and cancel function,
-//     processes the incoming items, and returns a result of type R
+//     processes the incoming items, and returns a result of type R. It receives:
+//   - ctx: A context for cancellation
+//   - in: Input channel receiving items of type I
+//   - cancel: Function to cancel the sink's context
 //
 // Type Parameters:
 //   - I: The type of items consumed by this sink
