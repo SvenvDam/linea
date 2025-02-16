@@ -7,14 +7,15 @@ import (
 // ProcessLoop processes elements from an input channel and handles completion.
 // Type parameters:
 //   - I: The type of elements received from the input channel
-//   - O: The type of elements that could be sent to the output channel
+//   - O: The type of elements that can be sent to the output channel
 //
 // Parameters:
 //   - ctx: Context for cancellation
 //   - in: Input channel to receive elements from
-//   - out: Output channel (unused in current implementation)
+//   - out: Output channel for downstream processing
 //   - onElem: Callback function executed for each received element
-//   - onDone: Callback function executed when processing is complete (either due to channel close or context cancellation)
+//   - onDone: Callback function executed when processing is complete
+//     (either due to channel close or context cancellation)
 func ProcessLoop[I, O any](
 	ctx context.Context,
 	in <-chan I,

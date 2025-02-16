@@ -34,23 +34,23 @@ func WithSourceBufSize(size int) SourceOption {
 //   - O: The type of items produced by this source
 //
 // Fields:
-//   - out: The output channel through which items are sent
 //   - setup: Function called to initialize and start the source
 type Source[O any] struct {
-	out   <-chan O
 	setup func(
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		drain chan struct{},
-	)
+	) <-chan O
 }
 
 // NewSource creates a new Source that produces items using the provided generate function.
 //
 // Parameters:
-//   - generate: A function that takes a context and returns a channel of type O
 //   - opts: Optional SourceOption functions to configure the source
+//   - generate: A function that takes a context and returns a channel of type O.
+//     It receives:
+//   - ctx: A context for cancellation
 //
 // Type Parameters:
 //   - O: The type of items produced by this source
@@ -69,14 +69,14 @@ func NewSource[O any](
 		opt(cfg)
 	}
 
-	out := make(chan O, cfg.bufSize)
-
 	setup := func(
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		drain chan struct{},
-	) {
+	) <-chan O {
+		out := make(chan O, cfg.bufSize)
+
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -103,10 +103,11 @@ func NewSource[O any](
 				}
 			}
 		}()
+
+		return out
 	}
 
 	source := &Source[O]{
-		out:   out,
 		setup: setup,
 	}
 

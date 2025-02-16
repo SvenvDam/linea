@@ -27,13 +27,12 @@ func connectFlows[I, O1, O2 any](
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		in <-chan I,
-	) {
-		flow1.setup(ctx, cancel, wg, in)
-		flow2.setup(ctx, cancel, wg, flow1.out)
+	) <-chan O2 {
+		link := flow1.setup(ctx, cancel, wg, in)
+		return flow2.setup(ctx, cancel, wg, link)
 	}
 
 	return &Flow[I, O2]{
-		out:   flow2.out,
 		setup: setup,
 	}
 }
@@ -56,13 +55,12 @@ func appendFlowToSource[I, O any](source *Source[I], flow *Flow[I, O]) *Source[O
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		drain chan struct{},
-	) {
-		source.setup(ctx, cancel, wg, drain)
-		flow.setup(ctx, cancel, wg, source.out)
+	) <-chan O {
+		link := source.setup(ctx, cancel, wg, drain)
+		return flow.setup(ctx, cancel, wg, link)
 	}
 
 	return &Source[O]{
-		out:   flow.out,
 		setup: setup,
 	}
 }
@@ -87,13 +85,12 @@ func prependFlowToSink[I, O, R any](flow *Flow[I, O], sink *Sink[O, R]) *Sink[I,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		in <-chan I,
-	) {
-		flow.setup(ctx, cancel, wg, in)
-		sink.setup(ctx, cancel, wg, flow.out)
+	) <-chan R {
+		link := flow.setup(ctx, cancel, wg, in)
+		return sink.setup(ctx, cancel, wg, link)
 	}
 
 	return &Sink[I, R]{
-		out:   sink.out,
 		setup: setup,
 	}
 }
@@ -117,10 +114,10 @@ func connectSourceToSink[I, R any](source *Source[I], sink *Sink[I, R]) *Stream[
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		drain chan struct{},
-	) {
-		source.setup(ctx, cancel, wg, drain)
-		sink.setup(ctx, cancel, wg, source.out)
+	) <-chan R {
+		link := source.setup(ctx, cancel, wg, drain)
+		return sink.setup(ctx, cancel, wg, link)
 	}
 
-	return newStream(setup, sink.out)
+	return newStream(setup)
 }

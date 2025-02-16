@@ -14,16 +14,14 @@ import (
 //   - O: The type of output items the Flow produces
 //
 // Fields:
-//   - out: The output channel that delivers transformed items
 //   - setup: A function that initializes the Flow's goroutine and connects it to the input channel
 type Flow[I, O any] struct {
-	out   <-chan O
 	setup func(
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		in <-chan I,
-	)
+	) <-chan O
 }
 
 // FlowOption is a function type for configuring Flow behavior.
@@ -53,16 +51,27 @@ func WithFlowBufSize(size int) FlowOption {
 	}
 }
 
-// NewFlow creates a new Flow that transforms input items to output items using the provided process function.
+// NewFlow creates a new Flow that transforms input items to output items using
+// the provided process function.
+//
+// The Flow automatically handles:
+//   - Goroutine lifecycle management
+//   - Context cancellation propagation
+//   - Channel cleanup on completion
+//
+// The process function is responsible for:
+//   - Transforming and sending output items
+//   - Handling its own cleanup in onDone
+//   - Managing any resources it creates
 //
 // Parameters:
+//   - opts: Optional FlowOption functions to configure the flow
 //   - process: A function that defines how to transform input items to output items.
 //     It receives:
 //   - ctx: A context for cancellation
 //   - in: Input channel receiving items of type I
-//   - out: Output channel for sending items of type O
+//   - out: Output channel for sending transformed items
 //   - cancel: Function to cancel the flow's context
-//   - opts: Optional FlowOption functions to configure the Flow
 //
 // Type Parameters:
 //   - I: The type of input items
@@ -83,24 +92,25 @@ func NewFlow[I, O any](
 		opt(cfg)
 	}
 
-	out := make(chan O, cfg.bufSize)
-
 	setup := func(
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		in <-chan I,
-	) {
+	) <-chan O {
+		out := make(chan O, cfg.bufSize)
+
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			defer close(out)
 			process(ctx, in, out, cancel)
 		}()
+
+		return out
 	}
 
 	f := &Flow[I, O]{
-		out:   out,
 		setup: setup,
 	}
 
