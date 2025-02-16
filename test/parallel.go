@@ -1,38 +1,21 @@
 package test
 
 import (
-	"sync"
-	"testing"
+	"sync/atomic"
 )
 
 type ParallelTracker struct {
-	mu                 sync.Mutex
-	currentParallelism int
-	maxParallelism     int
+	currentParallelism atomic.Int32
 }
 
-func NewParallelTracker(maxParallelism int) *ParallelTracker {
-	return &ParallelTracker{
-		maxParallelism:     maxParallelism,
-		currentParallelism: 0,
-		mu:                 sync.Mutex{},
+func NewParallelTracker() *ParallelTracker {
+	return &ParallelTracker{}
+}
+
+func (p *ParallelTracker) Track() (int, func()) {
+	current := p.currentParallelism.Add(1)
+
+	return int(current), func() {
+		p.currentParallelism.Add(-1)
 	}
-}
-
-func (p *ParallelTracker) Track(t *testing.T) (int, func()) {
-	p.mu.Lock()
-	p.currentParallelism++
-	p.mu.Unlock()
-
-	return p.currentParallelism, func() {
-		p.mu.Lock()
-		p.currentParallelism--
-		p.mu.Unlock()
-	}
-}
-
-func (p *ParallelTracker) Reset() {
-	p.mu.Lock()
-	p.currentParallelism = 0
-	p.mu.Unlock()
 }
