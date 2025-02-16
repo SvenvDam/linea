@@ -22,12 +22,14 @@ func Slice[O any](
 	slice []O,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context) <-chan O {
-		out := make(chan O)
-		go func() {
-			defer close(out)
-			util.SendMany(ctx, slice, out)
-		}()
-		return out
+	return core.NewSource(func(ctx context.Context, out chan<- O, drain chan struct{}, cancel context.CancelFunc) {
+		util.SourceLoop(ctx, out, drain, func(ctx context.Context) <-chan O {
+			out := make(chan O)
+			go func() {
+				defer close(out)
+				util.SendMany(ctx, slice, out)
+			}()
+			return out
+		})
 	}, opts...)
 }

@@ -44,20 +44,28 @@ type Source[O any] struct {
 	) <-chan O
 }
 
-// NewSource creates a new Source that produces items using the provided generate function.
+// NewSource creates a new Source that produces items using the provided process function.
+// The source is lazy and won't start producing items until it is connected to a flow or sink
+// and explicitly started.
 //
 // Parameters:
-//   - opts: Optional SourceOption functions to configure the source
-//   - generate: A function that takes a context and returns a channel of type O.
-//     It receives:
-//   - ctx: A context for cancellation
+//   - process: A function that implements the source's item generation logic.
+//   - opts: Optional SourceOption functions to configure the source behavior
+//     (e.g., WithSourceBufSize to set the output channel buffer size)
+//
+// The process function receives the following arguments:
+//   - ctx: A context for cancellation and coordination
+//   - out: A channel for sending produced items downstream
+//   - drain: A channel that closes when the source should stop producing new items
+//   - cancel: A function to cancel the source's context when needed
 //
 // Type Parameters:
-//   - O: The type of items produced by this source
+//   - O: The type of items that will be produced by this source
 //
-// Returns a configured Source ready to be started
+// Returns:
+//   - A configured Source instance that is ready to be connected to a flow or sink
 func NewSource[O any](
-	generate func(ctx context.Context) <-chan O,
+	process func(ctx context.Context, out chan<- O, drain chan struct{}, cancel context.CancelFunc),
 	opts ...SourceOption,
 ) *Source[O] {
 	cfg := &sourceConfig{}
@@ -79,27 +87,7 @@ func NewSource[O any](
 		go func() {
 			defer wg.Done()
 			defer close(out)
-
-			in := generate(ctx)
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-drain:
-					return
-				case elem, ok := <-in:
-					if !ok {
-						return
-					}
-					select {
-					case out <- elem:
-					case <-drain:
-						return
-					case <-ctx.Done():
-						return
-					}
-				}
-			}
+			process(ctx, out, drain, cancel)
 		}()
 
 		return out

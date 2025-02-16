@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/svenvdam/linea/core"
+	"github.com/svenvdam/linea/util"
 )
 
 // Repeat creates a Source that continuously emits the same item. The source will
@@ -21,18 +22,22 @@ func Repeat[O any](
 	elem O,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context) <-chan O {
-		out := make(chan O)
-		go func() {
-			defer close(out)
-			for {
-				select {
-				case out <- elem:
-				case <-ctx.Done():
-					return
+	return core.NewSource(func(ctx context.Context, out chan<- O, drain chan struct{}, cancel context.CancelFunc) {
+		util.SourceLoop(ctx, out, drain, func(ctx context.Context) <-chan O {
+			out := make(chan O)
+			go func() {
+				defer close(out)
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-drain:
+						return
+					case out <- elem:
+					}
 				}
-			}
-		}()
-		return out
+			}()
+			return out
+		})
 	}, opts...)
 }

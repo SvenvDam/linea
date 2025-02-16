@@ -4,6 +4,43 @@ import (
 	"context"
 )
 
+// SourceLoop processes elements from an input channel and handles completion.
+// Type parameters:
+//   - O: The type of elements received from the input channel
+//
+// Parameters:
+//   - ctx: Context for cancellation
+//   - out: Output channel for downstream processing
+//   - drain: Channel to signal when the source should drain
+//   - generate: Function that takes a context and returns a channel of type O
+func SourceLoop[O any](
+	ctx context.Context,
+	out chan<- O,
+	drain chan struct{},
+	generate func(ctx context.Context) <-chan O,
+) {
+	in := generate(ctx)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-drain:
+			return
+		case elem, ok := <-in:
+			if !ok {
+				return
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-drain:
+				return
+			case out <- elem:
+			}
+		}
+	}
+}
+
 // ProcessLoop processes elements from an input channel and handles completion.
 // Type parameters:
 //   - I: The type of elements received from the input channel

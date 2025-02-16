@@ -22,15 +22,9 @@ func Chan[O any](
 	ch <-chan O,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context) <-chan O {
-		out := make(chan O)
-		go func() {
-			defer close(out)
-			util.ProcessLoop(ctx, ch, out, func(elem O) {
-				util.Send(ctx, elem, out)
-			}, func() {})
-		}()
-
-		return out
+	return core.NewSource(func(ctx context.Context, out chan<- O, drain chan struct{}, cancel context.CancelFunc) {
+		util.SourceLoop(ctx, out, drain, func(ctx context.Context) <-chan O {
+			return ch
+		})
 	}, opts...)
 }
