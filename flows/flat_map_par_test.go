@@ -14,30 +14,35 @@ import (
 
 func TestFlatMapPar(t *testing.T) {
 	maxParallelism := 2
-	parTracker := test.NewParallelTracker(maxParallelism)
 
 	tests := []struct {
 		name        string
 		input       []int
-		mapper      func(int) []string
+		setup       func() func(int) []string
 		parallelism int
 		want        []string
 	}{
 		{
 			name:  "flattens and transforms items in parallel",
 			input: []int{1, 2, 3, 4},
-			mapper: func(i int) []string {
-				parallelism, cleanup := parTracker.Track(t)
-				assert.LessOrEqual(t, parallelism, maxParallelism)
-				defer cleanup()
-				time.Sleep(50 * time.Millisecond) // simulate work
-				if i%2 == 0 {
-					return []string{
-						"even" + string(rune(i+'0')),
-						"even" + string(rune(i+'0')),
+			setup: func() func(i int) []string {
+				parTracker := test.NewParallelTracker()
+				mapper := func(i int) []string {
+					parallelism, cleanup := parTracker.Track()
+					defer cleanup()
+
+					assert.LessOrEqual(t, parallelism, maxParallelism)
+
+					time.Sleep(50 * time.Millisecond) // simulate work
+					if i%2 == 0 {
+						return []string{
+							"even" + string(rune(i+'0')),
+							"even" + string(rune(i+'0')),
+						}
 					}
+					return []string{"odd" + string(rune(i+'0'))}
 				}
-				return []string{"odd" + string(rune(i+'0'))}
+				return mapper
 			},
 			parallelism: maxParallelism,
 			want: []string{
@@ -50,12 +55,16 @@ func TestFlatMapPar(t *testing.T) {
 		{
 			name:  "handles empty input",
 			input: []int{},
-			mapper: func(i int) []string {
-				parallelism, cleanup := parTracker.Track(t)
-				assert.LessOrEqual(t, parallelism, maxParallelism)
-				defer cleanup()
-				t.Error("mapper should not be called for empty input")
-				return nil
+			setup: func() func(i int) []string {
+				parTracker := test.NewParallelTracker()
+				mapper := func(i int) []string {
+					parallelism, cleanup := parTracker.Track()
+					assert.LessOrEqual(t, parallelism, maxParallelism)
+					defer cleanup()
+					t.Error("mapper should not be called for empty input")
+					return nil
+				}
+				return mapper
 			},
 			parallelism: maxParallelism,
 			want:        []string{},
@@ -63,15 +72,21 @@ func TestFlatMapPar(t *testing.T) {
 		{
 			name:  "handles mapper returning empty slices",
 			input: []int{1, 2, 3},
-			mapper: func(i int) []string {
-				parallelism, cleanup := parTracker.Track(t)
-				assert.LessOrEqual(t, parallelism, maxParallelism)
-				defer cleanup()
-				time.Sleep(50 * time.Millisecond) // simulate work
-				if i == 2 {
-					return []string{"middle"}
+			setup: func() func(i int) []string {
+				parTracker := test.NewParallelTracker()
+				mapper := func(i int) []string {
+					parallelism, cleanup := parTracker.Track()
+					defer cleanup()
+
+					assert.LessOrEqual(t, parallelism, maxParallelism)
+
+					time.Sleep(50 * time.Millisecond) // simulate work
+					if i == 2 {
+						return []string{"middle"}
+					}
+					return []string{}
 				}
-				return []string{}
+				return mapper
 			},
 			parallelism: maxParallelism,
 			want:        []string{"middle"},
@@ -79,15 +94,21 @@ func TestFlatMapPar(t *testing.T) {
 		{
 			name:  "handles nil slices from mapper",
 			input: []int{1, 2},
-			mapper: func(i int) []string {
-				parallelism, cleanup := parTracker.Track(t)
-				assert.LessOrEqual(t, parallelism, maxParallelism)
-				defer cleanup()
-				time.Sleep(50 * time.Millisecond) // simulate work
-				if i == 1 {
-					return nil
+			setup: func() func(i int) []string {
+				parTracker := test.NewParallelTracker()
+				mapper := func(i int) []string {
+					parallelism, cleanup := parTracker.Track()
+					defer cleanup()
+
+					assert.LessOrEqual(t, parallelism, maxParallelism)
+
+					time.Sleep(50 * time.Millisecond) // simulate work
+					if i == 1 {
+						return nil
+					}
+					return []string{"valid"}
 				}
-				return []string{"valid"}
+				return mapper
 			},
 			parallelism: maxParallelism,
 			want:        []string{"valid"},
@@ -97,7 +118,7 @@ func TestFlatMapPar(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			parTracker.Reset()
+			mapper := tt.setup()
 
 			before := make([]int, 0)
 			after := make([]string, 0)
@@ -105,7 +126,7 @@ func TestFlatMapPar(t *testing.T) {
 			stream := core.SourceThroughFlowToSink3(
 				sources.Slice(tt.input),
 				test.CaptureItems(&before),
-				FlatMapPar(tt.mapper, tt.parallelism),
+				FlatMapPar(mapper, tt.parallelism),
 				test.CaptureItems(&after),
 				sinks.Noop[string](),
 			)

@@ -15,12 +15,11 @@ import (
 
 func TestMapPar(t *testing.T) {
 	maxParallelism := 2
-	parTracker := test.NewParallelTracker(maxParallelism)
 
 	tests := []struct {
 		name        string
 		input       []int
-		mapper      func(int) string
+		setup       func() func(int) string
 		parallelism int
 		want        []string
 	}{
@@ -33,12 +32,19 @@ func TestMapPar(t *testing.T) {
 				}
 				return items
 			}(),
-			mapper: func(i int) string {
-				parallelism, cleanup := parTracker.Track(t)
-				assert.LessOrEqual(t, parallelism, maxParallelism)
-				defer cleanup()
-				time.Sleep(50 * time.Millisecond) // simulate work
-				return strconv.Itoa(i)
+			setup: func() func(i int) string {
+				parTracker := test.NewParallelTracker()
+				mapper := func(i int) string {
+					parallelism, cleanup := parTracker.Track()
+					defer cleanup()
+
+					assert.LessOrEqual(t, parallelism, maxParallelism)
+
+					time.Sleep(50 * time.Millisecond) // simulate work
+					return strconv.Itoa(i)
+				}
+
+				return mapper
 			},
 			parallelism: maxParallelism,
 			want: func() []string {
@@ -52,12 +58,18 @@ func TestMapPar(t *testing.T) {
 		{
 			name:  "handles errors",
 			input: []int{1, 2, 3},
-			mapper: func(i int) string {
-				parallelism, cleanup := parTracker.Track(t)
-				assert.LessOrEqual(t, parallelism, maxParallelism)
-				defer cleanup()
-				time.Sleep(50 * time.Millisecond) // simulate work
-				return strconv.Itoa(i)
+			setup: func() func(i int) string {
+				parTracker := test.NewParallelTracker()
+				mapper := func(i int) string {
+					parallelism, cleanup := parTracker.Track()
+					defer cleanup()
+
+					assert.LessOrEqual(t, parallelism, maxParallelism)
+
+					time.Sleep(50 * time.Millisecond) // simulate work
+					return strconv.Itoa(i)
+				}
+				return mapper
 			},
 			parallelism: maxParallelism,
 			want:        []string{"1", "2", "3"},
@@ -67,7 +79,7 @@ func TestMapPar(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			parTracker.Reset()
+			mapper := tt.setup()
 
 			before := make([]int, 0)
 			after := make([]string, 0)
@@ -75,7 +87,7 @@ func TestMapPar(t *testing.T) {
 			stream := core.SourceThroughFlowToSink3(
 				sources.Slice(tt.input),
 				test.CaptureItems(&before),
-				MapPar(tt.mapper, tt.parallelism),
+				MapPar(mapper, tt.parallelism),
 				test.CaptureItems(&after),
 				sinks.Noop[string](),
 			)
