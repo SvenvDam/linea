@@ -15,16 +15,14 @@ import (
 //   - R: The type of the final result
 //
 // Fields:
-//   - out: Channel that will receive the final result
 //   - setup: Function called to initialize and start the sink
 type Sink[I, R any] struct {
-	out   <-chan R
 	setup func(
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		in <-chan I,
-	)
+	) <-chan R
 }
 
 // NewSink creates a new Sink that processes items using the provided process function.
@@ -41,14 +39,14 @@ type Sink[I, R any] struct {
 func NewSink[I, R any](
 	process func(ctx context.Context, in <-chan I, cancel context.CancelFunc) R,
 ) *Sink[I, R] {
-	res := make(chan R)
-
 	setup := func(
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		in <-chan I,
-	) {
+	) <-chan R {
+		res := make(chan R)
+
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -56,10 +54,11 @@ func NewSink[I, R any](
 
 			util.Send(ctx, process(ctx, in, cancel), res)
 		}()
+
+		return res
 	}
 
 	return &Sink[I, R]{
-		out:   res,
 		setup: setup,
 	}
 }
