@@ -26,22 +26,21 @@ func Throttle[I any](
 	interval time.Duration,
 	opts ...core.FlowOption,
 ) *core.Flow[I, I] {
-	return core.NewFlow(func(ctx context.Context, in <-chan I, out chan<- I, cancel context.CancelFunc) {
-		remaining := n
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-
-		util.ProcessLoop(ctx, in, out, func(item I) {
-			for remaining <= 0 {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					remaining = n
-				}
+	remaining := n
+	ticker := time.NewTicker(interval)
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- I, cancel context.CancelFunc) bool {
+		for remaining <= 0 {
+			select {
+			case <-ctx.Done():
+				return false
+			case <-ticker.C:
+				remaining = n
 			}
-			util.Send(ctx, item, out)
-			remaining--
-		}, func() {})
+		}
+		util.Send(ctx, elem, out)
+		remaining--
+		return true
+	}, func(ctx context.Context, out chan<- I) {
+		ticker.Stop()
 	}, opts...)
 }

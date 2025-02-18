@@ -1,4 +1,6 @@
-package core
+package compose
+
+import "github.com/svenvdam/linea/core"
 
 // SourceThroughFlow creates a new source with the flow transformation applied.
 // This is the basic building block for creating processing pipelines, allowing
@@ -13,8 +15,8 @@ package core
 //   - flow: The flow that transforms items from type I to type O
 //
 // Returns a new Source that produces items of type O
-func SourceThroughFlow[I, O any](source *Source[I], flow *Flow[I, O]) *Source[O] {
-	return appendFlowToSource(source, flow)
+func SourceThroughFlow[I, O any](source *core.Source[I], flow *core.Flow[I, O]) *core.Source[O] {
+	return core.AppendFlowToSource(source, flow)
 }
 
 // SourceToSink creates a runnable stream from a source and a sink.
@@ -30,8 +32,8 @@ func SourceThroughFlow[I, O any](source *Source[I], flow *Flow[I, O]) *Source[O]
 //   - sink: The sink consuming items of type I and producing a result of type R
 //
 // Returns a Stream that can be executed to produce a result of type R
-func SourceToSink[I, R any](source *Source[I], sink *Sink[I, R]) *Stream[R] {
-	return connectSourceToSink(source, sink)
+func SourceToSink[I, R any](source *core.Source[I], sink *core.Sink[I, R]) *core.Stream[R] {
+	return core.ConnectSourceToSink(source, sink)
 }
 
 // Convenience functions for creating chains
@@ -51,12 +53,12 @@ func SourceToSink[I, R any](source *Source[I], sink *Sink[I, R]) *Stream[R] {
 //
 // Returns a new Source that produces items of type O2
 func SourceThroughFlow2[I, O1, O2 any](
-	source *Source[I],
-	flow1 *Flow[I, O1],
-	flow2 *Flow[O1, O2],
-) *Source[O2] {
-	s1 := appendFlowToSource(source, flow1)
-	return appendFlowToSource(s1, flow2)
+	source *core.Source[I],
+	flow1 *core.Flow[I, O1],
+	flow2 *core.Flow[O1, O2],
+) *core.Source[O2] {
+	s1 := core.AppendFlowToSource(source, flow1)
+	return core.AppendFlowToSource(s1, flow2)
 }
 
 // SourceThroughFlow3 creates a new source by applying three flows in sequence.
@@ -76,14 +78,14 @@ func SourceThroughFlow2[I, O1, O2 any](
 //
 // Returns a new Source that produces items of type O3
 func SourceThroughFlow3[I, O1, O2, O3 any](
-	source *Source[I],
-	flow1 *Flow[I, O1],
-	flow2 *Flow[O1, O2],
-	flow3 *Flow[O2, O3],
-) *Source[O3] {
-	s1 := appendFlowToSource(source, flow1)
-	s2 := appendFlowToSource(s1, flow2)
-	return appendFlowToSource(s2, flow3)
+	source *core.Source[I],
+	flow1 *core.Flow[I, O1],
+	flow2 *core.Flow[O1, O2],
+	flow3 *core.Flow[O2, O3],
+) *core.Source[O3] {
+	s1 := core.AppendFlowToSource(source, flow1)
+	s2 := core.AppendFlowToSource(s1, flow2)
+	return core.AppendFlowToSource(s2, flow3)
 }
 
 // SourceThroughFlowToSink connects a source to a sink through a flow and returns
@@ -101,9 +103,9 @@ func SourceThroughFlow3[I, O1, O2, O3 any](
 //   - sink: Sink consuming items of type O and producing result R
 //
 // Returns a Stream that will produce a result of type R when run
-func SourceThroughFlowToSink[I, O, R any](source *Source[I], flow *Flow[I, O], sink *Sink[O, R]) *Stream[R] {
-	s := appendFlowToSource(source, flow)
-	return connectSourceToSink(s, sink)
+func SourceThroughFlowToSink[I, O, R any](source *core.Source[I], flow *core.Flow[I, O], sink *core.Sink[O, R]) *core.Stream[R] {
+	s := core.AppendFlowToSource(source, flow)
+	return core.ConnectSourceToSink(s, sink)
 }
 
 // SourceThroughFlowToSink2 creates a runnable stream by connecting a source to a sink
@@ -124,14 +126,14 @@ func SourceThroughFlowToSink[I, O, R any](source *Source[I], flow *Flow[I, O], s
 //
 // Returns a Stream that can be executed to produce a result of type R
 func SourceThroughFlowToSink2[I, O1, O2, R any](
-	source *Source[I],
-	flow1 *Flow[I, O1],
-	flow2 *Flow[O1, O2],
-	sink *Sink[O2, R],
-) *Stream[R] {
-	s1 := appendFlowToSource(source, flow1)
-	s2 := appendFlowToSource(s1, flow2)
-	return connectSourceToSink(s2, sink)
+	source *core.Source[I],
+	flow1 *core.Flow[I, O1],
+	flow2 *core.Flow[O1, O2],
+	sink *core.Sink[O2, R],
+) *core.Stream[R] {
+	s1 := core.AppendFlowToSource(source, flow1)
+	s2 := core.AppendFlowToSource(s1, flow2)
+	return core.ConnectSourceToSink(s2, sink)
 }
 
 // SourceThroughFlowToSink3 creates a runnable stream by connecting a source to a sink
@@ -154,16 +156,16 @@ func SourceThroughFlowToSink2[I, O1, O2, R any](
 //
 // Returns a Stream that can be executed to produce a result of type R
 func SourceThroughFlowToSink3[I, O1, O2, O3, R any](
-	source *Source[I],
-	flow1 *Flow[I, O1],
-	flow2 *Flow[O1, O2],
-	flow3 *Flow[O2, O3],
-	sink *Sink[O3, R],
-) *Stream[R] {
-	s1 := appendFlowToSource(source, flow1)
-	s2 := appendFlowToSource(s1, flow2)
-	s3 := appendFlowToSource(s2, flow3)
-	return connectSourceToSink(s3, sink)
+	source *core.Source[I],
+	flow1 *core.Flow[I, O1],
+	flow2 *core.Flow[O1, O2],
+	flow3 *core.Flow[O2, O3],
+	sink *core.Sink[O3, R],
+) *core.Stream[R] {
+	s1 := core.AppendFlowToSource(source, flow1)
+	s2 := core.AppendFlowToSource(s1, flow2)
+	s3 := core.AppendFlowToSource(s2, flow3)
+	return core.ConnectSourceToSink(s3, sink)
 }
 
 // SinkThroughFlow creates a new sink by prepending a flow transformation.
@@ -179,8 +181,8 @@ func SourceThroughFlowToSink3[I, O1, O2, O3, R any](
 //   - sink: The sink consuming items of type O and producing result R
 //
 // Returns a new Sink that accepts items of type I and produces result R
-func SinkThroughFlow[I, O, R any](flow *Flow[I, O], sink *Sink[O, R]) *Sink[I, R] {
-	return prependFlowToSink(flow, sink)
+func SinkThroughFlow[I, O, R any](flow *core.Flow[I, O], sink *core.Sink[O, R]) *core.Sink[I, R] {
+	return core.PrependFlowToSink(flow, sink)
 }
 
 // SinkThroughFlow2 creates a new sink by prepending two flows in sequence.
@@ -199,12 +201,12 @@ func SinkThroughFlow[I, O, R any](flow *Flow[I, O], sink *Sink[O, R]) *Sink[I, R
 //
 // Returns a new Sink that accepts items of type I and produces result R
 func SinkThroughFlow2[I, O1, O2, R any](
-	flow1 *Flow[I, O1],
-	flow2 *Flow[O1, O2],
-	sink *Sink[O2, R],
-) *Sink[I, R] {
-	merged := MergeFlows(flow1, flow2)
-	return prependFlowToSink(merged, sink)
+	flow1 *core.Flow[I, O1],
+	flow2 *core.Flow[O1, O2],
+	sink *core.Sink[O2, R],
+) *core.Sink[I, R] {
+	merged := core.ConnectFlows(flow1, flow2)
+	return core.PrependFlowToSink(merged, sink)
 }
 
 // SinkThroughFlow3 creates a new sink by prepending three flows in sequence.
@@ -225,13 +227,14 @@ func SinkThroughFlow2[I, O1, O2, R any](
 //
 // Returns a new Sink that accepts items of type I and produces result R
 func SinkThroughFlow3[I, O1, O2, O3, R any](
-	flow1 *Flow[I, O1],
-	flow2 *Flow[O1, O2],
-	flow3 *Flow[O2, O3],
-	sink *Sink[O3, R],
-) *Sink[I, R] {
-	merged := MergeFlows3(flow1, flow2, flow3)
-	return prependFlowToSink(merged, sink)
+	flow1 *core.Flow[I, O1],
+	flow2 *core.Flow[O1, O2],
+	flow3 *core.Flow[O2, O3],
+	sink *core.Sink[O3, R],
+) *core.Sink[I, R] {
+	f1 := core.ConnectFlows(flow1, flow2)
+	f2 := core.ConnectFlows(f1, flow3)
+	return core.PrependFlowToSink(f2, sink)
 }
 
 // MergeFlows creates a new flow by combining two flows in sequence.
@@ -247,8 +250,8 @@ func SinkThroughFlow3[I, O1, O2, O3, R any](
 //   - flow2: Second flow transforming O1 to O2
 //
 // Returns a new Flow that transforms items from type I to O2
-func MergeFlows[I, O1, O2 any](flow1 *Flow[I, O1], flow2 *Flow[O1, O2]) *Flow[I, O2] {
-	return connectFlows(flow1, flow2)
+func MergeFlows[I, O1, O2 any](flow1 *core.Flow[I, O1], flow2 *core.Flow[O1, O2]) *core.Flow[I, O2] {
+	return core.ConnectFlows(flow1, flow2)
 }
 
 // MergeFlows3 creates a new flow by combining three flows in sequence.
@@ -267,10 +270,10 @@ func MergeFlows[I, O1, O2 any](flow1 *Flow[I, O1], flow2 *Flow[O1, O2]) *Flow[I,
 //
 // Returns a new Flow that transforms items from type I to O3
 func MergeFlows3[I, O1, O2, O3 any](
-	flow1 *Flow[I, O1],
-	flow2 *Flow[O1, O2],
-	flow3 *Flow[O2, O3],
-) *Flow[I, O3] {
-	f1 := connectFlows(flow1, flow2)
-	return connectFlows(f1, flow3)
+	flow1 *core.Flow[I, O1],
+	flow2 *core.Flow[O1, O2],
+	flow3 *core.Flow[O2, O3],
+) *core.Flow[I, O3] {
+	f1 := core.ConnectFlows(flow1, flow2)
+	return core.ConnectFlows(f1, flow3)
 }

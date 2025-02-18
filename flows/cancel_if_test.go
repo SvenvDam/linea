@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/svenvdam/linea/core"
+	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/sources"
 	"github.com/svenvdam/linea/test"
@@ -61,7 +61,7 @@ func TestCancelIf(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			stream := core.SourceThroughFlowToSink2(
+			stream := compose.SourceThroughFlowToSink2(
 				sources.Slice(tt.input),
 				CancelIf(tt.pred),
 				test.AssertEachItem(t, tt.check),

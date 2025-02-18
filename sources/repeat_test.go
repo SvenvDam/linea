@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/svenvdam/linea/core"
+	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/test"
 )
@@ -34,7 +34,7 @@ func TestRepeat(t *testing.T) {
 
 			seen := make([]int, 0)
 
-			stream := core.SourceThroughFlowToSink2(
+			stream := compose.SourceThroughFlowToSink2(
 				Repeat(tt.element),
 				test.AssertEachItem(t, func(t *testing.T, in int) {
 					assert.Equal(t, tt.element, in)

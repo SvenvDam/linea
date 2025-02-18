@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/svenvdam/linea/core"
+	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/sources"
 	"github.com/svenvdam/linea/test"
@@ -123,7 +123,7 @@ func TestFlatMapPar(t *testing.T) {
 			before := make([]int, 0)
 			after := make([]string, 0)
 
-			stream := core.SourceThroughFlowToSink3(
+			stream := compose.SourceThroughFlowToSink3(
 				sources.Slice(tt.input),
 				test.CaptureItems(&before),
 				FlatMapPar(mapper, tt.parallelism),

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/svenvdam/linea/core"
-	"github.com/svenvdam/linea/util"
 )
 
 // CancelIf creates a Sink that cancels stream processing when the predicate returns
@@ -21,13 +20,13 @@ import (
 func CancelIf[I any](
 	pred func(I) bool,
 ) *core.Sink[I, struct{}] {
-	return core.NewSink(func(ctx context.Context, in <-chan I, cancel context.CancelFunc) struct{} {
-		return util.SinkLoop(ctx, in, struct{}{}, func(item I, acc struct{}) struct{} {
-			if pred(item) {
+	return core.NewSink(
+		struct{}{},
+		func(ctx context.Context, in I, acc struct{}, cancel context.CancelFunc) struct{} {
+			if pred(in) {
 				cancel()
-				return acc
 			}
 			return acc
-		})
-	})
+		},
+	)
 }

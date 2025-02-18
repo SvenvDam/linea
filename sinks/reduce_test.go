@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/svenvdam/linea/core"
+	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/sources"
 )
 
@@ -45,7 +45,7 @@ func TestReduce(t *testing.T) {
 			ctx := context.Background()
 			ctx = tt.setup(ctx)
 
-			stream := core.SourceToSink(
+			stream := compose.SourceToSink(
 				sources.Slice(tt.elements),
 				Reduce(tt.initial, tt.reducer),
 			)

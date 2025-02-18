@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-// connectFlows combines two Flow components into a single Flow, where the output of flow1
+// ConnectFlows combines two Flow components into a single Flow, where the output of flow1
 // becomes the input to flow2. This allows for chaining data transformations.
 //
 // Type Parameters:
@@ -18,7 +18,7 @@ import (
 //   - flow2: Second Flow component that processes O1 to produce O2
 //
 // Returns a new Flow that processes data from type I to type O2
-func connectFlows[I, O1, O2 any](
+func ConnectFlows[I, O1, O2 any](
 	flow1 *Flow[I, O1],
 	flow2 *Flow[O1, O2],
 ) *Flow[I, O2] {
@@ -37,7 +37,7 @@ func connectFlows[I, O1, O2 any](
 	}
 }
 
-// appendFlowToSource attaches a Flow to a Source component, creating a new Source that
+// AppendFlowToSource attaches a Flow to a Source component, creating a new Source that
 // outputs the processed data. This allows for transforming the data as it leaves the source.
 //
 // Type Parameters:
@@ -49,7 +49,7 @@ func connectFlows[I, O1, O2 any](
 //   - flow: Flow component that transforms I to O
 //
 // Returns a new Source that produces data of type O
-func appendFlowToSource[I, O any](source *Source[I], flow *Flow[I, O]) *Source[O] {
+func AppendFlowToSource[I, O any](source *Source[I], flow *Flow[I, O]) *Source[O] {
 	setup := func(
 		ctx context.Context,
 		cancel context.CancelFunc,
@@ -65,7 +65,7 @@ func appendFlowToSource[I, O any](source *Source[I], flow *Flow[I, O]) *Source[O
 	}
 }
 
-// prependFlowToSink attaches a Flow to a Sink component, creating a new Sink that
+// PrependFlowToSink attaches a Flow to a Sink component, creating a new Sink that
 // accepts the input type of the Flow. This allows for transforming data before
 // it reaches the sink.
 //
@@ -79,7 +79,7 @@ func appendFlowToSource[I, O any](source *Source[I], flow *Flow[I, O]) *Source[O
 //   - sink: Sink component that processes O and produces result R
 //
 // Returns a new Sink that accepts type I and produces result R
-func prependFlowToSink[I, O, R any](flow *Flow[I, O], sink *Sink[O, R]) *Sink[I, R] {
+func PrependFlowToSink[I, O, R any](flow *Flow[I, O], sink *Sink[O, R]) *Sink[I, R] {
 	setup := func(
 		ctx context.Context,
 		cancel context.CancelFunc,
@@ -95,7 +95,7 @@ func prependFlowToSink[I, O, R any](flow *Flow[I, O], sink *Sink[O, R]) *Sink[I,
 	}
 }
 
-// connectSourceToSink connects a Source directly to a Sink, creating a complete Stream
+// ConnectSourceToSink connects a Source directly to a Sink, creating a complete Stream
 // that can be executed to produce a result. This is the final step in building a
 // processing pipeline.
 //
@@ -108,7 +108,7 @@ func prependFlowToSink[I, O, R any](flow *Flow[I, O], sink *Sink[O, R]) *Sink[I,
 //   - sink: Sink component consuming type I and producing result R
 //
 // Returns a Stream that can be executed to produce a result of type R
-func connectSourceToSink[I, R any](source *Source[I], sink *Sink[I, R]) *Stream[R] {
+func ConnectSourceToSink[I, R any](source *Source[I], sink *Sink[I, R]) *Stream[R] {
 	setup := func(
 		ctx context.Context,
 		cancel context.CancelFunc,

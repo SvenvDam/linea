@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/core"
 	"github.com/svenvdam/linea/flows"
 	"github.com/svenvdam/linea/sinks"
@@ -38,7 +39,7 @@ func TestBackpressure(t *testing.T) {
 				seenTimes = append(seenTimes, time.Now())
 			}, core.WithFlowBufSize(tt.bufSize))
 
-			stream := core.SourceThroughFlowToSink(
+			stream := compose.SourceThroughFlowToSink(
 				sources.Repeat(1), // fast source
 				timeLogFlow,
 				sinks.ForEach(func(elem int) { // slow sink

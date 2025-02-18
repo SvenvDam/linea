@@ -45,24 +45,29 @@ type Source[O any] struct {
 }
 
 // NewSource creates a new Source that produces items using the provided generate function.
+// The source is lazy and won't start producing items until it is connected to a flow or sink
+// and explicitly started.
 //
 // Parameters:
-//   - opts: Optional SourceOption functions to configure the source
-//   - generate: A function that takes a context and returns a channel of type O.
-//     It receives:
-//   - ctx: A context for cancellation
+//   - generate: A function that implements the source's item generation logic.
+//     It should return a channel from which items will be read and forwarded downstream.
+//   - opts: Optional SourceOption functions to configure the source behavior
+//     (e.g., WithSourceBufSize to set the output channel buffer size)
+//
+// The generate function receives the following arguments:
+//   - ctx: A context for cancellation and coordination
+//   - drain: A channel that closes when the source should stop producing new items
 //
 // Type Parameters:
-//   - O: The type of items produced by this source
+//   - O: The type of items that will be produced by this source
 //
-// Returns a configured Source ready to be started
+// Returns:
+//   - A configured Source instance that is ready to be connected to a flow or sink
 func NewSource[O any](
-	generate func(ctx context.Context) <-chan O,
+	generate func(ctx context.Context, drain <-chan struct{}) <-chan O,
 	opts ...SourceOption,
 ) *Source[O] {
-	cfg := &sourceConfig{
-		bufSize: defaultBufSize,
-	}
+	cfg := &sourceConfig{}
 
 	// Apply all options
 	for _, opt := range opts {
@@ -81,8 +86,7 @@ func NewSource[O any](
 		go func() {
 			defer wg.Done()
 			defer close(out)
-
-			in := generate(ctx)
+			in := generate(ctx, drain)
 			for {
 				select {
 				case <-ctx.Done():
@@ -94,11 +98,11 @@ func NewSource[O any](
 						return
 					}
 					select {
-					case out <- elem:
-					case <-drain:
-						return
 					case <-ctx.Done():
 						return
+					case <-drain:
+						return
+					case out <- elem:
 					}
 				}
 			}

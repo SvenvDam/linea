@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/svenvdam/linea/core"
-	"github.com/svenvdam/linea/util"
 )
 
 // Chan creates a Source that emits items from a channel. The source will continue
@@ -15,22 +14,14 @@ import (
 //
 // Parameters:
 //   - ch: The input channel from which items will be read
-//   - opts: Optional SourceOption functions to configure the source
+//   - opts: Optional configuration options for the source
 //
 // Returns a Source that produces items from the input channel
 func Chan[O any](
 	ch <-chan O,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context) <-chan O {
-		out := make(chan O)
-		go func() {
-			defer close(out)
-			util.ProcessLoop(ctx, ch, out, func(elem O) {
-				util.Send(ctx, elem, out)
-			}, func() {})
-		}()
-
-		return out
+	return core.NewSource(func(ctx context.Context, drain <-chan struct{}) <-chan O {
+		return ch
 	}, opts...)
 }

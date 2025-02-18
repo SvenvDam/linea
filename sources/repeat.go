@@ -14,25 +14,27 @@ import (
 //
 // Parameters:
 //   - elem: The item to emit repeatedly
-//   - opts: Optional SourceOption functions to configure the source
+//   - opts: Optional configuration options for the source
 //
 // Returns a Source that produces the same item indefinitely
 func Repeat[O any](
 	elem O,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context) <-chan O {
+	return core.NewSource(func(ctx context.Context, drain <-chan struct{}) <-chan O {
 		out := make(chan O)
 		go func() {
 			defer close(out)
 			for {
 				select {
-				case out <- elem:
 				case <-ctx.Done():
 					return
+				case <-drain:
+					return
+				case out <- elem:
 				}
 			}
 		}()
 		return out
-	}, opts...)
+	})
 }

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/svenvdam/linea/core"
+	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/sources"
 )
 
@@ -36,7 +36,7 @@ func TestForEach(t *testing.T) {
 			ctx = tt.setup(ctx)
 
 			fn, seen := tt.effect()
-			stream := core.SourceToSink(
+			stream := compose.SourceToSink(
 				sources.Slice(tt.elements),
 				ForEach(fn),
 			)

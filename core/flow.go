@@ -59,19 +59,24 @@ func WithFlowBufSize(size int) FlowOption {
 //   - Context cancellation propagation
 //   - Channel cleanup on completion
 //
-// The process function is responsible for:
-//   - Transforming and sending output items
-//   - Handling its own cleanup in onDone
-//   - Managing any resources it creates
-//
 // Parameters:
+//   - onElem: A function called for each input element.
+//   - onDone: A cleanup function called when the flow stops.
 //   - opts: Optional FlowOption functions to configure the flow
-//   - process: A function that defines how to transform input items to output items.
-//     It receives:
-//   - ctx: A context for cancellation
-//   - in: Input channel receiving items of type I
-//   - out: Output channel for sending transformed items
-//   - cancel: Function to cancel the flow's context
+//
+// onElem is responsible for:
+//   - Transforming the input item
+//   - Sending the transformed item to the output channel
+//   - Returning true to continue processing, false to stop the flow
+//
+// # It receives the current context, input element, output channel, and cancel function
+//
+// onDone is responsible for:
+//   - Performing final operations and cleanup
+//   - Sending remaining items to the output channel
+//   - Handling cleanup of any resources created during processing
+//
+// # It receives the current context and output channel
 //
 // Type Parameters:
 //   - I: The type of input items
@@ -80,12 +85,11 @@ func WithFlowBufSize(size int) FlowOption {
 // Returns:
 //   - A new Flow instance that will perform the specified transformation
 func NewFlow[I, O any](
-	process func(ctx context.Context, in <-chan I, out chan<- O, cancel context.CancelFunc),
+	onElem func(ctx context.Context, elem I, out chan<- O, cancel context.CancelFunc) bool,
+	onDone func(ctx context.Context, out chan<- O),
 	opts ...FlowOption,
 ) *Flow[I, O] {
-	cfg := &flowConfig{
-		bufSize: defaultBufSize,
-	}
+	cfg := &flowConfig{}
 
 	// Apply all options
 	for _, opt := range opts {
@@ -104,7 +108,23 @@ func NewFlow[I, O any](
 		go func() {
 			defer wg.Done()
 			defer close(out)
-			process(ctx, in, out, cancel)
+			for {
+				select {
+				case <-ctx.Done():
+					onDone(ctx, out)
+					return
+				case elem, ok := <-in:
+					if !ok {
+						onDone(ctx, out)
+						return
+					}
+					ok = onElem(ctx, elem, out, cancel)
+					if !ok {
+						onDone(ctx, out)
+						return
+					}
+				}
+			}
 		}()
 
 		return out
