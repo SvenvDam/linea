@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -26,6 +27,7 @@ func TestSend(t *testing.T) {
 			setup: func(ctx context.Context) context.Context {
 				ctx, cancel := context.WithCancel(ctx)
 				cancel()
+				time.Sleep(10 * time.Millisecond) // give the context time to cancel
 				return ctx
 			},
 			element:  42,
@@ -73,6 +75,7 @@ func TestSendMany(t *testing.T) {
 			setup: func(ctx context.Context) context.Context {
 				ctx, cancel := context.WithCancel(ctx)
 				cancel()
+				time.Sleep(10 * time.Millisecond) // give the context time to cancel
 				return ctx
 			},
 			elements:  []int{1, 2, 3},
