@@ -44,20 +44,19 @@ type Source[O any] struct {
 	) <-chan O
 }
 
-// NewSource creates a new Source that produces items using the provided process function.
+// NewSource creates a new Source that produces items using the provided generate function.
 // The source is lazy and won't start producing items until it is connected to a flow or sink
 // and explicitly started.
 //
 // Parameters:
-//   - process: A function that implements the source's item generation logic.
+//   - generate: A function that implements the source's item generation logic.
+//     It should return a channel from which items will be read and forwarded downstream.
 //   - opts: Optional SourceOption functions to configure the source behavior
 //     (e.g., WithSourceBufSize to set the output channel buffer size)
 //
-// The process function receives the following arguments:
+// The generate function receives the following arguments:
 //   - ctx: A context for cancellation and coordination
-//   - out: A channel for sending produced items downstream
 //   - drain: A channel that closes when the source should stop producing new items
-//   - cancel: A function to cancel the source's context when needed
 //
 // Type Parameters:
 //   - O: The type of items that will be produced by this source
@@ -65,7 +64,7 @@ type Source[O any] struct {
 // Returns:
 //   - A configured Source instance that is ready to be connected to a flow or sink
 func NewSource[O any](
-	process func(ctx context.Context, out chan<- O, drain chan struct{}, cancel context.CancelFunc),
+	generate func(ctx context.Context, drain <-chan struct{}) <-chan O,
 	opts ...SourceOption,
 ) *Source[O] {
 	cfg := &sourceConfig{}
@@ -87,7 +86,26 @@ func NewSource[O any](
 		go func() {
 			defer wg.Done()
 			defer close(out)
-			process(ctx, out, drain, cancel)
+			in := generate(ctx, drain)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-drain:
+					return
+				case elem, ok := <-in:
+					if !ok {
+						return
+					}
+					select {
+					case <-ctx.Done():
+						return
+					case <-drain:
+						return
+					case out <- elem:
+					}
+				}
+			}
 		}()
 
 		return out

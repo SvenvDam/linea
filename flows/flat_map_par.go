@@ -27,25 +27,20 @@ func FlatMapPar[I, O any](
 	parallelism int,
 	opts ...core.FlowOption,
 ) *core.Flow[I, O] {
-	return core.NewFlow(func(ctx context.Context, in <-chan I, out chan<- O, cancel context.CancelFunc) {
-		sem := make(chan struct{}, parallelism)
-		wg := sync.WaitGroup{}
-
-		util.ProcessLoop(ctx, in, out,
-			func(elem I) {
-				sem <- struct{}{} // wait for a slot
-				wg.Add(1)
-				go func() {
-					defer func() {
-						wg.Done()
-						<-sem // release the slot
-					}()
-					util.SendMany(ctx, fn(elem), out)
-				}()
-			},
-			func() {
-				wg.Wait() // wait for all goroutines to finish
-			},
-		)
+	sem := make(chan struct{}, parallelism)
+	wg := sync.WaitGroup{}
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- O, cancel context.CancelFunc) bool {
+		sem <- struct{}{} // wait for a slot
+		wg.Add(1)
+		go func() {
+			defer func() {
+				wg.Done()
+				<-sem // release the slot
+			}()
+			util.SendMany(ctx, fn(elem), out)
+		}()
+		return true
+	}, func(ctx context.Context, out chan<- O) {
+		wg.Wait() // wait for all goroutines to finish
 	}, opts...)
 }

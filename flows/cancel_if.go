@@ -19,14 +19,14 @@ import (
 // Returns a Flow that may cancel processing based on item values
 func CancelIf[I any](
 	pred func(I) bool,
+	opts ...core.FlowOption,
 ) *core.Flow[I, I] {
-	return core.NewFlow(func(ctx context.Context, in <-chan I, out chan<- I, cancel context.CancelFunc) {
-		util.ProcessLoop(ctx, in, out, func(item I) {
-			if pred(item) {
-				cancel()
-				return
-			}
-			util.Send(ctx, item, out)
-		}, func() {})
-	})
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- I, cancel context.CancelFunc) bool {
+		if pred(elem) {
+			cancel()
+			return false
+		}
+		util.Send(ctx, elem, out)
+		return true
+	}, func(ctx context.Context, out chan<- I) {}, opts...)
 }

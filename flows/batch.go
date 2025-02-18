@@ -23,20 +23,18 @@ func Batch[I any](
 	n int,
 	opts ...core.FlowOption,
 ) *core.Flow[I, []I] {
-	return core.NewFlow(func(ctx context.Context, in <-chan I, out chan<- []I, cancel context.CancelFunc) {
-		batch := make([]I, 0, n)
-
-		util.ProcessLoop(ctx, in, out, func(item I) {
-			batch = append(batch, item)
-			if len(batch) == n {
-				util.Send(ctx, batch, out)
-				batch = make([]I, 0, n)
-			}
-		}, func() {
-			if len(batch) > 0 {
-				util.Send(ctx, batch, out)
-				batch = make([]I, 0, n)
-			}
-		})
+	batch := make([]I, 0, n)
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- []I, cancel context.CancelFunc) bool {
+		batch = append(batch, elem)
+		if len(batch) == n {
+			util.Send(ctx, batch, out)
+			batch = make([]I, 0, n)
+		}
+		return true
+	}, func(ctx context.Context, out chan<- []I) {
+		if len(batch) > 0 {
+			util.Send(ctx, batch, out)
+			batch = make([]I, 0, n)
+		}
 	}, opts...)
 }

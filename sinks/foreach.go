@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/svenvdam/linea/core"
-	"github.com/svenvdam/linea/util"
 )
 
 // ForEach creates a Sink that applies a side-effect function to each item without
@@ -21,10 +20,11 @@ import (
 func ForEach[I any](
 	fn func(I),
 ) *core.Sink[I, struct{}] {
-	return core.NewSink(func(ctx context.Context, in <-chan I, cancel context.CancelFunc) struct{} {
-		return util.SinkLoop(ctx, in, struct{}{}, func(item I, acc struct{}) struct{} {
-			fn(item)
+	return core.NewSink(
+		struct{}{},
+		func(ctx context.Context, in I, acc struct{}, cancel context.CancelFunc) struct{} {
+			fn(in)
 			return acc
-		})
-	})
+		},
+	)
 }

@@ -11,22 +11,22 @@ import (
 func AssertEachItem[I any](
 	t *testing.T,
 	check func(t *testing.T, elem I),
+	opts ...core.FlowOption,
 ) *core.Flow[I, I] {
-	return core.NewFlow(func(ctx context.Context, in <-chan I, out chan<- I, cancel context.CancelFunc) {
-		util.ProcessLoop(ctx, in, out, func(elem I) {
-			check(t, elem)
-			util.Send(ctx, elem, out)
-		}, func() {})
-	})
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- I, cancel context.CancelFunc) bool {
+		check(t, elem)
+		util.Send(ctx, elem, out)
+		return true
+	}, func(ctx context.Context, out chan<- I) {}, opts...)
 }
 
 func CaptureItems[I any](
 	elems *[]I,
+	opts ...core.FlowOption,
 ) *core.Flow[I, I] {
-	return core.NewFlow(func(ctx context.Context, in <-chan I, out chan<- I, cancel context.CancelFunc) {
-		util.ProcessLoop(ctx, in, out, func(elem I) {
-			*elems = append(*elems, elem)
-			util.Send(ctx, elem, out)
-		}, func() {})
-	})
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- I, cancel context.CancelFunc) bool {
+		*elems = append(*elems, elem)
+		util.Send(ctx, elem, out)
+		return true
+	}, func(ctx context.Context, out chan<- I) {}, opts...)
 }

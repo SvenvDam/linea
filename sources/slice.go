@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/svenvdam/linea/core"
-	"github.com/svenvdam/linea/util"
 )
 
 // Slice creates a Source that emits all items from a slice in order. The source
@@ -15,21 +14,27 @@ import (
 //
 // Parameters:
 //   - slice: The slice containing items to emit
-//   - opts: Optional SourceOption functions to configure the source
+//   - opts: Optional configuration options for the source
 //
 // Returns a Source that produces items from the slice
 func Slice[O any](
 	slice []O,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context, out chan<- O, drain chan struct{}, cancel context.CancelFunc) {
-		util.SourceLoop(ctx, out, drain, func(ctx context.Context) <-chan O {
-			out := make(chan O)
-			go func() {
-				defer close(out)
-				util.SendMany(ctx, slice, out)
-			}()
-			return out
-		})
-	}, opts...)
+	return core.NewSource(func(ctx context.Context, drain <-chan struct{}) <-chan O {
+		out := make(chan O)
+		go func() {
+			defer close(out)
+			for _, elem := range slice {
+				select {
+				case <-ctx.Done():
+					return
+				case <-drain:
+					return
+				case out <- elem:
+				}
+			}
+		}()
+		return out
+	})
 }

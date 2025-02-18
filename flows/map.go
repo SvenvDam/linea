@@ -23,9 +23,8 @@ func Map[I, O any](
 	fn func(I) O,
 	opts ...core.FlowOption,
 ) *core.Flow[I, O] {
-	return core.NewFlow(func(ctx context.Context, in <-chan I, out chan<- O, cancel context.CancelFunc) {
-		util.ProcessLoop(ctx, in, out, func(elem I) {
-			util.Send(ctx, fn(elem), out)
-		}, func() {})
-	}, opts...)
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- O, cancel context.CancelFunc) bool {
+		util.Send(ctx, fn(elem), out)
+		return true
+	}, func(ctx context.Context, out chan<- O) {}, opts...)
 }

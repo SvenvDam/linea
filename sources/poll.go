@@ -17,7 +17,7 @@ import (
 // Parameters:
 //   - poll: Function that takes a context and returns the next value to emit
 //   - interval: Duration between polling attempts
-//   - opts: Optional SourceOption functions to configure the source
+//   - opts: Optional configuration options for the source
 //
 // Returns a Source that produces items from the polling function
 func Poll[O any](
@@ -25,26 +25,24 @@ func Poll[O any](
 	interval time.Duration,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context, out chan<- O, drain chan struct{}, cancel context.CancelFunc) {
-		util.SourceLoop(ctx, out, drain, func(ctx context.Context) <-chan O {
-			out := make(chan O)
-			go func() {
-				defer close(out)
-				ticker := time.NewTicker(interval)
-				defer ticker.Stop()
+	return core.NewSource(func(ctx context.Context, drain <-chan struct{}) <-chan O {
+		out := make(chan O)
+		go func() {
+			defer close(out)
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
 
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					case <-drain:
-						return
-					case <-ticker.C:
-						util.Send(ctx, poll(ctx), out)
-					}
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-drain:
+					return
+				case <-ticker.C:
+					util.Send(ctx, poll(ctx), out)
 				}
-			}()
-			return out
-		})
-	}, opts...)
+			}
+		}()
+		return out
+	})
 }
