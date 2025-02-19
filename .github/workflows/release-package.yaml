@@ -27,7 +27,7 @@ jobs:
           echo "RELEASE_VERSION=$VERSION" >> $GITHUB_ENV
       - name: Check if version tag exists
         run: |
-          if git tag -l "$RELEASE_VERSION"; then
+          if git rev-parse "refs/tags/$RELEASE_VERSION" >/dev/null 2>&1; then
             echo "Error: Tag $RELEASE_VERSION already exists"
             exit 1
           fi
