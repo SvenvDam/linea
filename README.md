@@ -27,7 +27,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/svenvdam/linea/core"
+	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/flows"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/sources"
@@ -35,7 +35,7 @@ import (
 
 func main() {
 	ctx := context.Background()
-	stream := core.SourceThroughFlowToSink2(
+	stream := compose.SourceThroughFlowToSink2(
 		sources.Slice([]int{1, 2, 3, 4, 5}), // source from slice
 		flows.Filter(func(i int) bool { return i%2 == 0 }), // filter even numbers
 		flows.Map(func(i int) string { return strconv.Itoa(i) }), // map to string
@@ -59,14 +59,14 @@ Linea provides several ways to create and compose streams. The recommended appro
 
 ```go
 // Create a stream using SourceThroughFlowToSink helpers
-stream1 := core.SourceThroughFlowToSink(
+stream1 := compose.SourceThroughFlowToSink(
     sources.Slice([]int{1, 2, 3}),    // Source
     flows.Map(func(i int) int { return i * 2 }), // Flow
     sinks.Slice[int](),               // Sink
 )
 
 // Chain multiple flows using SourceThroughFlowToSink2, 3, etc.
-stream2 := core.SourceThroughFlowToSink2(
+stream2 := compose.SourceThroughFlowToSink2(
     sources.Slice([]string{"a", "b"}),
     flows.Map(strings.ToUpper),
     flows.Filter(func(s string) bool { return s != "B" }),
@@ -107,7 +107,7 @@ func processWithShutdown(data []int) {
     ctx, cancel := context.WithCancel(context.Background())
     defer cancel()
 
-    stream := core.SourceThroughFlowToSink2(
+    stream := compose.SourceThroughFlowToSink2(
         sources.Slice(data),
         flows.Map(slowOperation),
         sinks.Slice[int](),
