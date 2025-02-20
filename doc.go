@@ -14,7 +14,7 @@
 //
 // Example usage:
 //
-//	stream := core.SourceThroughFlowToSink2(
+//	stream := compose.SourceThroughFlowToSink2(
 //	    sources.Slice([]int{1,2,3,4,5}),
 //	    flows.Filter(func(i int) bool { return i%2 == 0 }),
 //	    flows.Map(func(i int) string { return strconv.Itoa(i) }),

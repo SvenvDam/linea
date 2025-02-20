@@ -1,8 +1,10 @@
 # Linea
-![GitHub Tag](https://img.shields.io/github/v/tag/svenvdam/linea)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/svenvdam/linea/ci.yaml)
-![Codecov](https://img.shields.io/codecov/c/github/svenvdam/linea)
-![GitHub License](https://img.shields.io/github/license/svenvdam/linea)
+[![GoDoc](https://pkg.go.dev/badge/github.com/svenvdam/linea)](https://pkg.go.dev/github.com/svenvdam/linea)
+[![GitHub Tag](https://img.shields.io/github/v/tag/svenvdam/linea)](https://github.com/SvenvDam/linea/tags)
+[![codecov](https://codecov.io/gh/SvenvDam/linea/graph/badge.svg?token=OUHEZKF81O)](https://codecov.io/gh/SvenvDam/linea)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/svenvdam/linea/ci.yaml)](https://github.com/SvenvDam/linea/actions/workflows/ci.yaml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/svenvdam/linea)](https://goreportcard.com/report/github.com/svenvdam/linea)
+[![GitHub License](https://img.shields.io/github/license/svenvdam/linea)](https://github.com/SvenvDam/linea/blob/main/LICENSE)
 
 Linea is a composable stream processing library for Go.
 
