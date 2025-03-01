@@ -2,6 +2,7 @@ package sources
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"github.com/svenvdam/linea/core"
@@ -41,11 +42,11 @@ func Poll[O any](
 			ticker := time.NewTicker(interval)
 			defer ticker.Stop()
 
-			// Set to true to poll immediately on start
-			var shouldPoll bool = true
+			// Set to true to poll immediately on start, using atomic operations for thread safety
+			shouldPoll := atomic.Bool{}
 
 			for {
-				if shouldPoll {
+				if shouldPoll.Load() {
 					// Get value from polling function
 					val, more, err := poll(ctx)
 
@@ -68,7 +69,7 @@ func Poll[O any](
 					}
 
 					// Wait for next tick before polling again
-					shouldPoll = false
+					shouldPoll.Store(false)
 				}
 
 				// Wait for next tick or context cancellation
@@ -78,7 +79,7 @@ func Poll[O any](
 				case <-drain:
 					return
 				case <-ticker.C:
-					shouldPoll = true
+					shouldPoll.Store(true)
 				}
 			}
 		}()
