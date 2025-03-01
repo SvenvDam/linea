@@ -9,6 +9,8 @@ This package provides connectors for AWS services to be used with the Linea stre
 The SQS package currently provides:
 
 - **Source**: Read messages from an SQS queue
+- **SendFlow**: Send messages to SQS queue while preserving the original input for downstream processing
+- **DeleteFlow**: Delete messages from SQS queue by extracting receipt handles from inputs
 
 Additional functionality (sinks and flows) will be added in future updates.
 

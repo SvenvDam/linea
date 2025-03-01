@@ -12,24 +12,25 @@ import (
 	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/test"
+	"github.com/svenvdam/linea/util"
 )
 
 // Test message variables to reduce duplication
 var (
 	testMsg1 = types.Message{
-		MessageId:     stringPtr("msg1"),
-		Body:          stringPtr("message 1"),
-		ReceiptHandle: stringPtr("receipt1"),
+		MessageId:     util.AsPtr("msg1"),
+		Body:          util.AsPtr("message 1"),
+		ReceiptHandle: util.AsPtr("receipt1"),
 	}
 	testMsg2 = types.Message{
-		MessageId:     stringPtr("msg2"),
-		Body:          stringPtr("message 2"),
-		ReceiptHandle: stringPtr("receipt2"),
+		MessageId:     util.AsPtr("msg2"),
+		Body:          util.AsPtr("message 2"),
+		ReceiptHandle: util.AsPtr("receipt2"),
 	}
 	testMsg3 = types.Message{
-		MessageId:     stringPtr("msg3"),
-		Body:          stringPtr("message 3"),
-		ReceiptHandle: stringPtr("receipt3"),
+		MessageId:     util.AsPtr("msg3"),
+		Body:          util.AsPtr("message 3"),
+		ReceiptHandle: util.AsPtr("receipt3"),
 	}
 )
 
@@ -198,7 +199,7 @@ type MockSQSClient struct {
 	ReceiveMessageFunc func(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
 }
 
-var _ SQSClient = (*MockSQSClient)(nil)
+var _ SQSReceiveClient = (*MockSQSClient)(nil)
 
 func (m *MockSQSClient) ReceiveMessage(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error) {
 	return m.ReceiveMessageFunc(ctx, params, optFns...)
@@ -226,8 +227,4 @@ func createMockReceiveMessageFunc(responses []mockResponse) func(ctx context.Con
 
 		return response.output, response.err
 	}
-}
-
-func stringPtr(s string) *string {
-	return &s
 }

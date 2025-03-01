@@ -12,8 +12,8 @@ import (
 	"github.com/svenvdam/linea/sources"
 )
 
-// SQSClient defines the interface for SQS operations needed by the Source
-type SQSClient interface {
+// SQSReceiveClient defines the interface for SQS operations needed by the Source
+type SQSReceiveClient interface {
 	ReceiveMessage(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
 }
 
@@ -49,7 +49,7 @@ type SourceConfig struct {
 //
 // Returns a Source that produces SQS messages
 func Source(
-	client SQSClient,
+	client SQSReceiveClient,
 	config SourceConfig,
 	opts ...core.SourceOption,
 ) *core.Source[types.Message] {
