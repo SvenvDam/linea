@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/test"
@@ -38,10 +39,10 @@ func TestSource(t *testing.T) {
 	tests := []struct {
 		name           string
 		config         SourceConfig
-		mockResponses  []mockResponse
 		expectedResult []types.Message
 		duration       time.Duration
 		expectError    bool
+		setupMocks     func(t *testing.T, mock *MockSQSReceiveClient)
 	}{
 		{
 			name: "successfully polls messages",
@@ -52,23 +53,32 @@ func TestSource(t *testing.T) {
 				VisibilityTimeout:   30,
 				PollInterval:        50 * time.Millisecond,
 			},
-			mockResponses: []mockResponse{
-				{
-					output: &sqs.ReceiveMessageOutput{
-						Messages: []types.Message{testMsg1, testMsg2},
-					},
-					err: nil,
-				},
-				{
-					output: &sqs.ReceiveMessageOutput{
-						Messages: []types.Message{testMsg3},
-					},
-					err: nil,
-				},
-			},
 			expectedResult: []types.Message{testMsg1, testMsg2, testMsg3},
 			duration:       200 * time.Millisecond,
 			expectError:    false,
+			setupMocks: func(t *testing.T, mockClient *MockSQSReceiveClient) {
+				expectedInput := &sqs.ReceiveMessageInput{
+					QueueUrl:            util.AsPtr("https://sqs.example.com/queue"),
+					MaxNumberOfMessages: 5,
+					WaitTimeSeconds:     5,
+					VisibilityTimeout:   30,
+				}
+
+				// First call returns all three test messages
+				firstCall := mockClient.EXPECT().
+					ReceiveMessage(mock.Anything, expectedInput, mock.Anything)
+				firstCall.Return(&sqs.ReceiveMessageOutput{
+					Messages: []types.Message{testMsg1, testMsg2, testMsg3},
+				}, nil).Once()
+
+				// Allow additional calls with empty responses
+				mockClient.EXPECT().
+					ReceiveMessage(mock.Anything, expectedInput, mock.Anything).
+					Return(&sqs.ReceiveMessageOutput{
+						Messages: []types.Message{},
+					}, nil).
+					Maybe()
+			},
 		},
 		{
 			name: "handles empty responses",
@@ -79,23 +89,39 @@ func TestSource(t *testing.T) {
 				VisibilityTimeout:   30,
 				PollInterval:        50 * time.Millisecond,
 			},
-			mockResponses: []mockResponse{
-				{
-					output: &sqs.ReceiveMessageOutput{
-						Messages: []types.Message{},
-					},
-					err: nil,
-				},
-				{
-					output: &sqs.ReceiveMessageOutput{
-						Messages: []types.Message{testMsg1},
-					},
-					err: nil,
-				},
-			},
 			expectedResult: []types.Message{testMsg1},
 			duration:       150 * time.Millisecond,
 			expectError:    false,
+			setupMocks: func(t *testing.T, mockClient *MockSQSReceiveClient) {
+				expectedInput := &sqs.ReceiveMessageInput{
+					QueueUrl:            util.AsPtr("https://sqs.example.com/queue"),
+					MaxNumberOfMessages: 5,
+					WaitTimeSeconds:     1,
+					VisibilityTimeout:   30,
+				}
+
+				// First call returns empty response
+				firstCall := mockClient.EXPECT().
+					ReceiveMessage(mock.Anything, expectedInput, mock.Anything)
+				firstCall.Return(&sqs.ReceiveMessageOutput{
+					Messages: []types.Message{},
+				}, nil).Once()
+
+				// Second call returns message 1
+				secondCall := mockClient.EXPECT().
+					ReceiveMessage(mock.Anything, expectedInput, mock.Anything)
+				secondCall.Return(&sqs.ReceiveMessageOutput{
+					Messages: []types.Message{testMsg1},
+				}, nil).Once()
+
+				// Allow additional calls with empty responses
+				mockClient.EXPECT().
+					ReceiveMessage(mock.Anything, expectedInput, mock.Anything).
+					Return(&sqs.ReceiveMessageOutput{
+						Messages: []types.Message{},
+					}, nil).
+					Maybe()
+			},
 		},
 		{
 			name: "cancels stream on error",
@@ -106,28 +132,31 @@ func TestSource(t *testing.T) {
 				VisibilityTimeout:   30,
 				PollInterval:        50 * time.Millisecond,
 			},
-			mockResponses: []mockResponse{
-				{
-					output: &sqs.ReceiveMessageOutput{
-						Messages: []types.Message{testMsg1},
-					},
-					err: nil,
-				},
-				{
-					output: nil,
-					err:    errors.New("connection error"),
-				},
-				// This response should never be reached because the stream should be cancelled
-				{
-					output: &sqs.ReceiveMessageOutput{
-						Messages: []types.Message{testMsg2},
-					},
-					err: nil,
-				},
-			},
 			expectedResult: []types.Message{testMsg1},
 			duration:       150 * time.Millisecond,
 			expectError:    true,
+			setupMocks: func(t *testing.T, mockClient *MockSQSReceiveClient) {
+				expectedInput := &sqs.ReceiveMessageInput{
+					QueueUrl:            util.AsPtr("https://sqs.example.com/queue"),
+					MaxNumberOfMessages: 5,
+					WaitTimeSeconds:     1,
+					VisibilityTimeout:   30,
+				}
+
+				// First call returns message 1
+				firstCall := mockClient.EXPECT().
+					ReceiveMessage(mock.Anything, expectedInput, mock.Anything)
+				firstCall.Return(&sqs.ReceiveMessageOutput{
+					Messages: []types.Message{testMsg1},
+				}, nil).Once()
+
+				// Second call returns an error
+				secondCall := mockClient.EXPECT().
+					ReceiveMessage(mock.Anything, expectedInput, mock.Anything)
+				secondCall.Return(nil, errors.New("connection error")).Once()
+
+				// No additional calls expected because the stream should be cancelled
+			},
 		},
 		{
 			name: "respects max number of messages",
@@ -138,17 +167,32 @@ func TestSource(t *testing.T) {
 				VisibilityTimeout:   30,
 				PollInterval:        50 * time.Millisecond,
 			},
-			mockResponses: []mockResponse{
-				{
-					output: &sqs.ReceiveMessageOutput{
-						Messages: []types.Message{testMsg1, testMsg2},
-					},
-					err: nil,
-				},
-			},
 			expectedResult: []types.Message{testMsg1, testMsg2},
 			duration:       100 * time.Millisecond,
 			expectError:    false,
+			setupMocks: func(t *testing.T, mockClient *MockSQSReceiveClient) {
+				expectedInput := &sqs.ReceiveMessageInput{
+					QueueUrl:            util.AsPtr("https://sqs.example.com/queue"),
+					MaxNumberOfMessages: 2,
+					WaitTimeSeconds:     1,
+					VisibilityTimeout:   30,
+				}
+
+				// First call returns messages 1 and 2
+				firstCall := mockClient.EXPECT().
+					ReceiveMessage(mock.Anything, expectedInput, mock.Anything)
+				firstCall.Return(&sqs.ReceiveMessageOutput{
+					Messages: []types.Message{testMsg1, testMsg2},
+				}, nil).Once()
+
+				// Allow additional calls with empty responses
+				mockClient.EXPECT().
+					ReceiveMessage(mock.Anything, expectedInput, mock.Anything).
+					Return(&sqs.ReceiveMessageOutput{
+						Messages: []types.Message{},
+					}, nil).
+					Maybe()
+			},
 		},
 	}
 
@@ -161,9 +205,10 @@ func TestSource(t *testing.T) {
 			captured := make([]types.Message, 0)
 
 			// Set up the mock client with the responses for this test
-			mockClient := &MockSQSClient{
-				ReceiveMessageFunc: createMockReceiveMessageFunc(tt.mockResponses),
-			}
+			mockClient := NewMockSQSReceiveClient(t)
+
+			// Set up the mock expectations using the test case's setupMocks function
+			tt.setupMocks(t, mockClient)
 
 			// Create the source using our mock client
 			source := Source(mockClient, tt.config)
@@ -190,41 +235,5 @@ func TestSource(t *testing.T) {
 
 			assert.ElementsMatch(t, tt.expectedResult, captured)
 		})
-	}
-}
-
-// Helper types and functions
-
-type MockSQSClient struct {
-	ReceiveMessageFunc func(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
-}
-
-var _ SQSReceiveClient = (*MockSQSClient)(nil)
-
-func (m *MockSQSClient) ReceiveMessage(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error) {
-	return m.ReceiveMessageFunc(ctx, params, optFns...)
-}
-
-type mockResponse struct {
-	output *sqs.ReceiveMessageOutput
-	err    error
-}
-
-func createMockReceiveMessageFunc(responses []mockResponse) func(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error) {
-	responseIndex := 0
-
-	return func(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error) {
-		// If we've gone through all responses, stop returning messages
-		// This prevents continuous polling in the test
-		if responseIndex >= len(responses) {
-			// Return empty response to indicate no more messages
-			return &sqs.ReceiveMessageOutput{Messages: []types.Message{}}, nil
-		}
-
-		// Get the current response and increment the index
-		response := responses[responseIndex]
-		responseIndex++
-
-		return response.output, response.err
 	}
 }

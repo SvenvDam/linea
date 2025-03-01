@@ -1,0 +1,11 @@
+log-level: warn
+with-expecter: true
+packages:
+  github.com/svenvdam/linea/connectors/aws:
+    config:
+      all: true
+      inpackage: true
+      recursive: true
+      dir: "{{ .InterfaceDirRelative }}"
+      filename: "mock_{{ snakecase .InterfaceName }}.go"
+      mockname: "Mock{{.InterfaceName}}"

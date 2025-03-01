@@ -7,21 +7,12 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/sources"
 	"github.com/svenvdam/linea/util"
 )
-
-// MockSQSDeleteClient is a mock implementation of SQSDeleteClient for testing
-type MockSQSDeleteClient struct {
-	DeleteMessageFunc func(ctx context.Context, params *sqs.DeleteMessageInput, optFns ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error)
-}
-
-// DeleteMessage implements the SQSDeleteClient interface
-func (m *MockSQSDeleteClient) DeleteMessage(ctx context.Context, params *sqs.DeleteMessageInput, optFns ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error) {
-	return m.DeleteMessageFunc(ctx, params, optFns...)
-}
 
 // TestMessage is a simple struct for testing the DeleteFlow
 type TestMessage struct {
@@ -32,13 +23,11 @@ type TestMessage struct {
 
 func TestDeleteFlow(t *testing.T) {
 	tests := []struct {
-		name           string
-		config         DeleteFlowConfig
-		input          TestMessage
-		mockResponse   *sqs.DeleteMessageOutput
-		mockError      error
-		expectedInput  *sqs.DeleteMessageInput
-		expectNilError bool
+		name            string
+		config          DeleteFlowConfig
+		input           TestMessage
+		setupMocks      func(t *testing.T, mock *MockSQSDeleteClient)
+		expectedResults []DeleteMessageResult[TestMessage]
 	}{
 		{
 			name: "successfully deletes message",
@@ -50,13 +39,27 @@ func TestDeleteFlow(t *testing.T) {
 				ReceiptHandle: "receipt123",
 				Content:       "test message",
 			},
-			mockResponse: &sqs.DeleteMessageOutput{},
-			mockError:    nil,
-			expectedInput: &sqs.DeleteMessageInput{
-				QueueUrl:      util.AsPtr("https://sqs.example.com/queue"),
-				ReceiptHandle: util.AsPtr("receipt123"),
+			setupMocks: func(t *testing.T, mockClient *MockSQSDeleteClient) {
+				expectedInput := &sqs.DeleteMessageInput{
+					QueueUrl:      util.AsPtr("https://sqs.example.com/queue"),
+					ReceiptHandle: util.AsPtr("receipt123"),
+				}
+
+				mockClient.EXPECT().
+					DeleteMessage(mock.Anything, expectedInput, mock.Anything).
+					Return(&sqs.DeleteMessageOutput{}, nil).Once()
 			},
-			expectNilError: true,
+			expectedResults: []DeleteMessageResult[TestMessage]{
+				{
+					Original: TestMessage{
+						ID:            "msg123",
+						ReceiptHandle: "receipt123",
+						Content:       "test message",
+					},
+					Output: &sqs.DeleteMessageOutput{},
+					Error:  nil,
+				},
+			},
 		},
 		{
 			name: "handles error from SQS",
@@ -68,13 +71,27 @@ func TestDeleteFlow(t *testing.T) {
 				ReceiptHandle: "receipt123",
 				Content:       "test message",
 			},
-			mockResponse: nil,
-			mockError:    errors.New("sqs error"),
-			expectedInput: &sqs.DeleteMessageInput{
-				QueueUrl:      util.AsPtr("https://sqs.example.com/queue"),
-				ReceiptHandle: util.AsPtr("receipt123"),
+			setupMocks: func(t *testing.T, mockClient *MockSQSDeleteClient) {
+				expectedInput := &sqs.DeleteMessageInput{
+					QueueUrl:      util.AsPtr("https://sqs.example.com/queue"),
+					ReceiptHandle: util.AsPtr("receipt123"),
+				}
+
+				mockClient.EXPECT().
+					DeleteMessage(mock.Anything, expectedInput, mock.Anything).
+					Return(nil, errors.New("sqs error")).Once()
 			},
-			expectNilError: false,
+			expectedResults: []DeleteMessageResult[TestMessage]{
+				{
+					Original: TestMessage{
+						ID:            "msg123",
+						ReceiptHandle: "receipt123",
+						Content:       "test message",
+					},
+					Output: nil,
+					Error:  errors.New("sqs error"),
+				},
+			},
 		},
 		{
 			name: "handles nil receipt handle",
@@ -86,10 +103,20 @@ func TestDeleteFlow(t *testing.T) {
 				ReceiptHandle: "", // Empty receipt handle will result in nil
 				Content:       "test message",
 			},
-			mockResponse:   nil,
-			mockError:      nil,
-			expectedInput:  nil, // No call to DeleteMessage expected
-			expectNilError: false,
+			setupMocks: func(t *testing.T, mockClient *MockSQSDeleteClient) {
+				// No mock expectations because DeleteMessage should not be called
+			},
+			expectedResults: []DeleteMessageResult[TestMessage]{
+				{
+					Original: TestMessage{
+						ID:            "msg123",
+						ReceiptHandle: "",
+						Content:       "test message",
+					},
+					Output: nil,
+					Error:  errors.New("receipt handle is nil"),
+				},
+			},
 		},
 	}
 
@@ -98,27 +125,9 @@ func TestDeleteFlow(t *testing.T) {
 			// Create a context for the test
 			ctx := context.Background()
 
-			// Track if DeleteMessage was called
-			deleteMessageCalled := false
-
-			// Create a mock client with the expected response
-			mockClient := &MockSQSDeleteClient{
-				DeleteMessageFunc: func(ctx context.Context, params *sqs.DeleteMessageInput, optFns ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error) {
-					// Mark that DeleteMessage was called
-					deleteMessageCalled = true
-
-					// If we don't expect a call to DeleteMessage, fail the test
-					if tt.expectedInput == nil {
-						t.Fatal("DeleteMessage was called but no call was expected")
-					}
-
-					// Verify the input matches what we expect
-					assert.Equal(t, tt.expectedInput.QueueUrl, params.QueueUrl)
-					assert.Equal(t, tt.expectedInput.ReceiptHandle, params.ReceiptHandle)
-
-					return tt.mockResponse, tt.mockError
-				},
-			}
+			// Set up the mock client
+			mockClient := NewMockSQSDeleteClient(t)
+			tt.setupMocks(t, mockClient)
 
 			// Create a receipt handle extractor function
 			receiptHandleExtractor := func(msg TestMessage) *string {
@@ -147,35 +156,8 @@ func TestDeleteFlow(t *testing.T) {
 			// Get the results from the stream result
 			resultSlice := result.Value
 
-			// Check that we got exactly one result
-			assert.Len(t, resultSlice, 1, "Expected exactly one result")
-
-			// Check the result matches what we expect
-			result0 := resultSlice[0]
-
-			// Check the original input is preserved
-			assert.Equal(t, tt.input, result0.Original)
-
-			// Check if DeleteMessage was called when expected
-			if tt.expectedInput != nil {
-				assert.True(t, deleteMessageCalled, "Expected DeleteMessage to be called")
-			} else {
-				assert.False(t, deleteMessageCalled, "Expected DeleteMessage not to be called")
-			}
-
-			// Check the output
-			if tt.mockResponse == nil {
-				assert.Nil(t, result0.Output)
-			} else {
-				assert.NotNil(t, result0.Output)
-			}
-
-			// Check the error
-			if tt.expectNilError {
-				assert.Nil(t, result0.Error)
-			} else {
-				assert.NotNil(t, result0.Error)
-			}
+			// Compare the results using ElementsMatch
+			assert.ElementsMatch(t, tt.expectedResults, resultSlice)
 		})
 	}
 }

@@ -14,3 +14,11 @@ tidy:
 lint:
 	go vet ./...
 	golangci-lint run
+
+.PHONY: generate
+generate:
+	(cd connectors/aws && mockery)
+
+.PHONY: clean
+clean:
+	find . -name "mock_*.go" -type f -delete
