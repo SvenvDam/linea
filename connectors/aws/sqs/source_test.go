@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/svenvdam/linea/compose"
+	"github.com/svenvdam/linea/connectors/aws/sqs/mocks"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/test"
 	"github.com/svenvdam/linea/util"
@@ -42,7 +43,7 @@ func TestSource(t *testing.T) {
 		expectedResult []types.Message
 		duration       time.Duration
 		expectError    bool
-		setupMocks     func(t *testing.T, mock *MockSQSReceiveClient)
+		setupMocks     func(t *testing.T, mock *mocks.MockSQSReceiveClient)
 	}{
 		{
 			name: "successfully polls messages",
@@ -56,7 +57,7 @@ func TestSource(t *testing.T) {
 			expectedResult: []types.Message{testMsg1, testMsg2, testMsg3},
 			duration:       200 * time.Millisecond,
 			expectError:    false,
-			setupMocks: func(t *testing.T, mockClient *MockSQSReceiveClient) {
+			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSReceiveClient) {
 				expectedInput := &sqs.ReceiveMessageInput{
 					QueueUrl:            util.AsPtr("https://sqs.example.com/queue"),
 					MaxNumberOfMessages: 5,
@@ -92,7 +93,7 @@ func TestSource(t *testing.T) {
 			expectedResult: []types.Message{testMsg1},
 			duration:       150 * time.Millisecond,
 			expectError:    false,
-			setupMocks: func(t *testing.T, mockClient *MockSQSReceiveClient) {
+			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSReceiveClient) {
 				expectedInput := &sqs.ReceiveMessageInput{
 					QueueUrl:            util.AsPtr("https://sqs.example.com/queue"),
 					MaxNumberOfMessages: 5,
@@ -135,7 +136,7 @@ func TestSource(t *testing.T) {
 			expectedResult: []types.Message{testMsg1},
 			duration:       150 * time.Millisecond,
 			expectError:    true,
-			setupMocks: func(t *testing.T, mockClient *MockSQSReceiveClient) {
+			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSReceiveClient) {
 				expectedInput := &sqs.ReceiveMessageInput{
 					QueueUrl:            util.AsPtr("https://sqs.example.com/queue"),
 					MaxNumberOfMessages: 5,
@@ -170,7 +171,7 @@ func TestSource(t *testing.T) {
 			expectedResult: []types.Message{testMsg1, testMsg2},
 			duration:       100 * time.Millisecond,
 			expectError:    false,
-			setupMocks: func(t *testing.T, mockClient *MockSQSReceiveClient) {
+			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSReceiveClient) {
 				expectedInput := &sqs.ReceiveMessageInput{
 					QueueUrl:            util.AsPtr("https://sqs.example.com/queue"),
 					MaxNumberOfMessages: 2,
@@ -201,7 +202,7 @@ func TestSource(t *testing.T) {
 			// Create a context that will be used to run the test
 			ctx := context.Background()
 
-			mockClient := NewMockSQSReceiveClient(t)
+			mockClient := mocks.NewMockSQSReceiveClient(t)
 			tt.setupMocks(t, mockClient)
 
 			source := Source(mockClient, tt.config)

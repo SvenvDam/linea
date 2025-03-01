@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/svenvdam/linea/compose"
+	"github.com/svenvdam/linea/connectors/aws/sqs/mocks"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/sources"
 	"github.com/svenvdam/linea/util"
@@ -19,7 +20,7 @@ func TestSendFlow(t *testing.T) {
 		name            string
 		config          SendFlowConfig
 		input           string
-		setupMocks      func(t *testing.T, mock *MockSQSSendClient)
+		setupMocks      func(t *testing.T, mock *mocks.MockSQSSendClient)
 		expectedResults []SendMessageResult[string]
 	}{
 		{
@@ -29,7 +30,7 @@ func TestSendFlow(t *testing.T) {
 				DelaySeconds: 5,
 			},
 			input: "test message",
-			setupMocks: func(t *testing.T, mockClient *MockSQSSendClient) {
+			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSSendClient) {
 				expectedInput := &sqs.SendMessageInput{
 					QueueUrl:     util.AsPtr("https://sqs.example.com/queue"),
 					MessageBody:  util.AsPtr("test message"),
@@ -58,7 +59,7 @@ func TestSendFlow(t *testing.T) {
 				QueueURL: "https://sqs.example.com/queue",
 			},
 			input: "test message",
-			setupMocks: func(t *testing.T, mockClient *MockSQSSendClient) {
+			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSSendClient) {
 				expectedInput := &sqs.SendMessageInput{
 					QueueUrl:    util.AsPtr("https://sqs.example.com/queue"),
 					MessageBody: util.AsPtr("test message"),
@@ -84,7 +85,7 @@ func TestSendFlow(t *testing.T) {
 			ctx := context.Background()
 
 			// Set up the mock client
-			mockClient := NewMockSQSSendClient(t)
+			mockClient := mocks.NewMockSQSSendClient(t)
 			tt.setupMocks(t, mockClient)
 
 			// Create a message builder function for strings

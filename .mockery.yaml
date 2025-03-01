@@ -4,8 +4,8 @@ packages:
   github.com/svenvdam/linea/connectors/aws:
     config:
       all: true
-      inpackage: true
       recursive: true
-      dir: "{{ .InterfaceDirRelative }}"
+      outpkg: "mocks"
+      dir: "{{ .InterfaceDirRelative }}/mocks"
       filename: "mock_{{ snakecase .InterfaceName }}.go"
       mockname: "Mock{{.InterfaceName}}"

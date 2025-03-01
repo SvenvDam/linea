@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/svenvdam/linea/compose"
+	"github.com/svenvdam/linea/connectors/aws/sqs/mocks"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/sources"
 	"github.com/svenvdam/linea/util"
@@ -26,7 +27,7 @@ func TestDeleteFlow(t *testing.T) {
 		name            string
 		config          DeleteFlowConfig
 		input           TestMessage
-		setupMocks      func(t *testing.T, mock *MockSQSDeleteClient)
+		setupMocks      func(t *testing.T, mock *mocks.MockSQSDeleteClient)
 		expectedResults []DeleteMessageResult[TestMessage]
 	}{
 		{
@@ -39,7 +40,7 @@ func TestDeleteFlow(t *testing.T) {
 				ReceiptHandle: "receipt123",
 				Content:       "test message",
 			},
-			setupMocks: func(t *testing.T, mockClient *MockSQSDeleteClient) {
+			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSDeleteClient) {
 				expectedInput := &sqs.DeleteMessageInput{
 					QueueUrl:      util.AsPtr("https://sqs.example.com/queue"),
 					ReceiptHandle: util.AsPtr("receipt123"),
@@ -71,7 +72,7 @@ func TestDeleteFlow(t *testing.T) {
 				ReceiptHandle: "receipt123",
 				Content:       "test message",
 			},
-			setupMocks: func(t *testing.T, mockClient *MockSQSDeleteClient) {
+			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSDeleteClient) {
 				expectedInput := &sqs.DeleteMessageInput{
 					QueueUrl:      util.AsPtr("https://sqs.example.com/queue"),
 					ReceiptHandle: util.AsPtr("receipt123"),
@@ -103,7 +104,7 @@ func TestDeleteFlow(t *testing.T) {
 				ReceiptHandle: "", // Empty receipt handle will result in nil
 				Content:       "test message",
 			},
-			setupMocks: func(t *testing.T, mockClient *MockSQSDeleteClient) {
+			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSDeleteClient) {
 				// No mock expectations because DeleteMessage should not be called
 			},
 			expectedResults: []DeleteMessageResult[TestMessage]{
@@ -126,7 +127,7 @@ func TestDeleteFlow(t *testing.T) {
 			ctx := context.Background()
 
 			// Set up the mock client
-			mockClient := NewMockSQSDeleteClient(t)
+			mockClient := mocks.NewMockSQSDeleteClient(t)
 			tt.setupMocks(t, mockClient)
 
 			// Create a receipt handle extractor function
