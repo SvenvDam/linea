@@ -42,20 +42,20 @@ func TestMap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			before := make([]int, 0)
-			after := make([]string, 0)
 
 			stream := compose.SourceThroughFlowToSink3(
 				sources.Slice(tt.input),
-				test.CaptureItems(&before),
+				test.CheckItems(t, func(t *testing.T, seen []int) {
+					assert.Equal(t, tt.input, seen)
+				}),
 				Map(tt.mapper),
-				test.CaptureItems(&after),
+				test.CheckItems(t, func(t *testing.T, seen []string) {
+					assert.Equal(t, tt.want, seen)
+				}),
 				sinks.Noop[string](),
 			)
 
 			res := <-stream.Run(ctx)
-			assert.Equal(t, tt.want, after)
-			assert.Equal(t, tt.input, before)
 			assert.True(t, res.Ok)
 		})
 	}

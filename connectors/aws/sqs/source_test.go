@@ -201,22 +201,16 @@ func TestSource(t *testing.T) {
 			// Create a context that will be used to run the test
 			ctx := context.Background()
 
-			// Initialize a slice to capture the messages processed
-			captured := make([]types.Message, 0)
-
-			// Set up the mock client with the responses for this test
 			mockClient := NewMockSQSReceiveClient(t)
-
-			// Set up the mock expectations using the test case's setupMocks function
 			tt.setupMocks(t, mockClient)
 
-			// Create the source using our mock client
 			source := Source(mockClient, tt.config)
 
-			// Create a stream that collects the messages
 			stream := compose.SourceThroughFlowToSink(
 				source,
-				test.CaptureItems(&captured),
+				test.CheckItems(t, func(t *testing.T, elems []types.Message) {
+					assert.Equal(t, tt.expectedResult, elems)
+				}),
 				sinks.Noop[types.Message](),
 			)
 
@@ -226,14 +220,11 @@ func TestSource(t *testing.T) {
 			stream.Drain()
 			result := <-resultChan
 
-			// Check if we expected an error
 			if tt.expectError {
 				assert.False(t, result.Ok, "Expected stream to fail due to error")
 			} else {
 				assert.True(t, result.Ok, "Expected stream to complete successfully")
 			}
-
-			assert.ElementsMatch(t, tt.expectedResult, captured)
 		})
 	}
 }

@@ -193,14 +193,14 @@ func TestPoll(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			seen := make([]int, 0)
-
 			stream := compose.SourceThroughFlowToSink2(
 				Poll(tt.poll(), tt.interval),
 				test.AssertEachItem(t, func(t *testing.T, in int) {
 					assert.Positive(t, in)
 				}),
-				test.CaptureItems(&seen),
+				test.CheckItems(t, func(t *testing.T, seen []int) {
+					tt.check(t, seen)
+				}),
 				sinks.Noop[int](),
 			)
 
@@ -214,7 +214,6 @@ func TestPoll(t *testing.T) {
 			} else {
 				assert.True(t, res.Ok)
 			}
-			tt.check(t, seen)
 		})
 	}
 }

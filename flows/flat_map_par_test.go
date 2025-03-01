@@ -120,21 +120,20 @@ func TestFlatMapPar(t *testing.T) {
 			ctx := context.Background()
 			mapper := tt.setup()
 
-			before := make([]int, 0)
-			after := make([]string, 0)
-
 			stream := compose.SourceThroughFlowToSink3(
 				sources.Slice(tt.input),
-				test.CaptureItems(&before),
+				test.CheckItems(t, func(t *testing.T, elems []int) {
+					assert.Equal(t, tt.input, elems)
+				}),
 				FlatMapPar(mapper, tt.parallelism),
-				test.CaptureItems(&after),
+				test.CheckItems(t, func(t *testing.T, elems []string) {
+					assert.ElementsMatch(t, tt.want, elems)
+				}),
 				sinks.Noop[string](),
 			)
 
 			res := <-stream.Run(ctx)
 			assert.True(t, res.Ok)
-			assert.Equal(t, tt.input, before)
-			assert.ElementsMatch(t, tt.want, after) // Use ElementsMatch since order is not guaranteed
 		})
 	}
 }

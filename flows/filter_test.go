@@ -47,20 +47,20 @@ func TestFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			before := make([]int, 0)
-			after := make([]int, 0)
 
 			stream := compose.SourceThroughFlowToSink3(
 				sources.Slice(tt.input),
-				test.CaptureItems(&before),
+				test.CheckItems(t, func(t *testing.T, elems []int) {
+					assert.Equal(t, tt.input, elems)
+				}),
 				Filter(tt.pred),
-				test.CaptureItems(&after),
+				test.CheckItems(t, func(t *testing.T, elems []int) {
+					assert.Equal(t, tt.want, elems)
+				}),
 				sinks.Noop[int](),
 			)
 
 			res := <-stream.Run(ctx)
-			assert.Equal(t, tt.input, before)
-			assert.Equal(t, tt.want, after)
 			assert.True(t, res.Ok)
 		})
 	}

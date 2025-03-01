@@ -20,13 +20,17 @@ func AssertEachItem[I any](
 	}, func(ctx context.Context, out chan<- I) {}, opts...)
 }
 
-func CaptureItems[I any](
-	elems *[]I,
+func CheckItems[I any](
+	t *testing.T,
+	check func(t *testing.T, seen []I),
 	opts ...core.FlowOption,
 ) *core.Flow[I, I] {
+	seen := make([]I, 0)
 	return core.NewFlow(func(ctx context.Context, elem I, out chan<- I, cancel context.CancelFunc) bool {
-		*elems = append(*elems, elem)
+		seen = append(seen, elem)
 		util.Send(ctx, elem, out)
 		return true
-	}, func(ctx context.Context, out chan<- I) {}, opts...)
+	}, func(ctx context.Context, out chan<- I) {
+		check(t, seen)
+	}, opts...)
 }

@@ -46,22 +46,21 @@ func TestForEach(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			before := make([]int, 0)
-			after := make([]int, 0)
-
 			fn, seen := tt.effect()
 
 			stream := compose.SourceThroughFlowToSink3(
 				sources.Slice(tt.input),
-				test.CaptureItems(&before),
+				test.CheckItems(t, func(t *testing.T, elems []int) {
+					assert.Equal(t, tt.input, elems)
+				}),
 				ForEach(fn),
-				test.CaptureItems(&after),
+				test.CheckItems(t, func(t *testing.T, elems []int) {
+					assert.Equal(t, tt.want, elems)
+				}),
 				sinks.Noop[int](),
 			)
 
 			res := <-stream.Run(ctx)
-			assert.Equal(t, tt.want, after)
-			assert.Equal(t, tt.input, before)
 			assert.True(t, res.Ok)
 			for _, item := range tt.input {
 				val, ok := seen.Load(item)
