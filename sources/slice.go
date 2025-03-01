@@ -21,7 +21,7 @@ func Slice[O any](
 	slice []O,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context, drain <-chan struct{}) <-chan O {
+	return core.NewSource(func(ctx context.Context, drain <-chan struct{}, cancel context.CancelFunc) <-chan O {
 		out := make(chan O)
 		go func() {
 			defer close(out)

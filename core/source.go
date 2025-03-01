@@ -64,7 +64,7 @@ type Source[O any] struct {
 // Returns:
 //   - A configured Source instance that is ready to be connected to a flow or sink
 func NewSource[O any](
-	generate func(ctx context.Context, drain <-chan struct{}) <-chan O,
+	generate func(ctx context.Context, drain <-chan struct{}, cancel context.CancelFunc) <-chan O,
 	opts ...SourceOption,
 ) *Source[O] {
 	cfg := &sourceConfig{}
@@ -86,7 +86,7 @@ func NewSource[O any](
 		go func() {
 			defer wg.Done()
 			defer close(out)
-			in := generate(ctx, drain)
+			in := generate(ctx, drain, cancel)
 			for {
 				select {
 				case <-ctx.Done():

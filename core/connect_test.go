@@ -51,7 +51,7 @@ func TestConnectFlows(t *testing.T) {
 
 func TestAppendFlowToSource(t *testing.T) {
 	// Create a simple source that emits one number
-	source := NewSource(func(ctx context.Context, drain <-chan struct{}) <-chan int {
+	source := NewSource(func(ctx context.Context, drain <-chan struct{}, cancel context.CancelFunc) <-chan int {
 		out := make(chan int)
 		go func() {
 			defer close(out)
@@ -126,7 +126,7 @@ func TestPrependFlowToSink(t *testing.T) {
 
 func TestConnectSourceToSink(t *testing.T) {
 	// Create a source that emits one number
-	source := NewSource(func(ctx context.Context, drain <-chan struct{}) <-chan int {
+	source := NewSource(func(ctx context.Context, drain <-chan struct{}, cancel context.CancelFunc) <-chan int {
 		out := make(chan int)
 		go func() {
 			defer close(out)
