@@ -1,5 +1,9 @@
 log-level: warn
 with-expecter: true
+issue-845-fix: true
+resolve-type-alias: false
+disable-version-string: true
+
 packages:
   github.com/svenvdam/linea/connectors/aws:
     config:

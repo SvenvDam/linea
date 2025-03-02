@@ -15,7 +15,7 @@ fmt:
 test: generate
 	@for module in $(GO_MODULES); do \
 		echo "Testing $$module"; \
-		(cd $$module && go test -v -race -cover ./...); \
+		(cd $$module && CGO_ENABLED=0 go test -race -cover ./...); \
 	done
 
 .PHONY: tidy
