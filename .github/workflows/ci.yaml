@@ -14,10 +14,10 @@ jobs:
       modules: ${{ steps.find-modules.outputs.modules }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install jq
-        run: sudo apt-get install -y jq
       - id: find-modules
         uses: ./.github/actions/find-modules
+        with:
+          file-name: 'go.mod'
 
   check-modules:
     name: Check Go modules
