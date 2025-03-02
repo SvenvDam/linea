@@ -1,0 +1,34 @@
+name: Go Checks
+description: Run all Go code checks (lint, test, format, tidy)
+
+inputs:
+  working-directory:
+    description: 'Directory containing the Go module to check'
+    required: true
+    default: '.'
+
+runs:
+  using: composite
+  steps:
+    - name: Generate mocks
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: mockery
+
+    - name: Check go mod tidy
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: go mod tidy -diff
+
+    - name: Run linting
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        working-directory: ${{ inputs.working-directory }}
+
+    - name: Run tests
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "Running tests..."
+        go test -v -race -coverprofile=coverage.out ./...
