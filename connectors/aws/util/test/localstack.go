@@ -16,7 +16,7 @@ import (
 func SetupLocalstack(ctx context.Context) (*aws.Config, testcontainers.Container, error) {
 	container, err := localstack.Run(
 		ctx,
-		"localstack/localstack:3.7",
+		"localstack/localstack:4.2",
 		testcontainers.WithEnv(map[string]string{}),
 	)
 	if err != nil {
