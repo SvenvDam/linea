@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/connectors/aws/sqs/mocks"
+	"github.com/svenvdam/linea/connectors/aws/util"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/test"
-	"github.com/svenvdam/linea/util"
 )
 
 // Test message variables to reduce duplication

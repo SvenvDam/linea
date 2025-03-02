@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/connectors/aws/sqs/mocks"
+	"github.com/svenvdam/linea/connectors/aws/util"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/sources"
-	"github.com/svenvdam/linea/util"
 )
 
 func TestSendFlow(t *testing.T) {
