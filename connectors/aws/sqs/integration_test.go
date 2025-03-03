@@ -19,12 +19,12 @@ import (
 	"github.com/svenvdam/linea/sinks"
 )
 
-// TestMessageProcessor tests a complete SQS processing flow:
+// TestSqsStream tests a complete SQS processing flow:
 // 1. Read messages from source queue
 // 2. Transform messages
 // 3. Write transformed messages to destination queue
 // 4. Delete original messages from source queue
-func TestMessageProcessor(t *testing.T) {
+func TestSqsStream(t *testing.T) {
 	// Setup test context with timeout
 	ctx := context.Background()
 
@@ -39,9 +39,9 @@ func TestMessageProcessor(t *testing.T) {
 	sqsClient := sqs.NewFromConfig(*awsCfg)
 
 	// Setup test queues with short visibility timeout to verify actual deletion
-	sourceQueueURL, err := setupQueue(ctx, sqsClient, "source-queue", 1) // 1 second visibility timeout
+	sourceQueueURL, err := setupQueue(ctx, sqsClient, "source-queue", 30)
 	require.NoError(t, err)
-	destQueueURL, err := setupQueue(ctx, sqsClient, "dest-queue", 30) // normal visibility timeout
+	destQueueURL, err := setupQueue(ctx, sqsClient, "dest-queue", 30)
 	require.NoError(t, err)
 
 	// Send test messages to source queue
@@ -53,24 +53,18 @@ func TestMessageProcessor(t *testing.T) {
 	err = sendTestMessages(ctx, sqsClient, sourceQueueURL, testMessages)
 	require.NoError(t, err)
 
-	// Create message processor that:
-	// 1. Reads from source queue
-	// 2. Transforms messages to uppercase
-	// 3. Sends to destination queue
-	// 4. Deletes from source queue
-
-	// Create message processor
-	processor := createMessageProcessor(sqsClient, sourceQueueURL, destQueueURL)
-	defer processor.Cancel()
+	// Create message sqsStream
+	sqsStream := createSqsStream(sqsClient, sourceQueueURL, destQueueURL)
+	defer sqsStream.Cancel()
 
 	// Run the processor for a short time to process messages
-	resultChan := processor.Run(ctx)
+	resultChan := sqsStream.Run(ctx)
 
 	// Sleep to allow processing to complete
 	time.Sleep(2 * time.Second)
 
 	// Drain the processor
-	processor.Drain()
+	sqsStream.Drain()
 	result := <-resultChan
 	assert.True(t, result.Ok, "Expected processor to complete successfully")
 
@@ -94,16 +88,25 @@ func TestMessageProcessor(t *testing.T) {
 	assert.ElementsMatch(t, expectedMessages, receivedBodies,
 		"Destination queue should contain all transformed messages")
 
-	// Wait for visibility timeout to expire to ensure we're testing actual deletion
-	// and not just temporary invisibility
-	time.Sleep(2 * time.Second) // Wait longer than the 1-second visibility timeout
-
-	// Read messages from source queue to verify they were deleted
+	// Read messages from source queue to verify no more messages are in the queue
 	sourceMessages, err := receiveAllMessages(ctx, sqsClient, sourceQueueURL)
 	require.NoError(t, err)
 
-	// Verify the source queue is empty (all messages were deleted)
-	assert.Empty(t, sourceMessages, "Source queue should be empty after processing (messages should be deleted, not just hidden)")
+	assert.Empty(t, sourceMessages, "Source queue should be empty after processing")
+
+	assert.Eventually(
+		t,
+		func() bool {
+			attributes, err := getQueueAttributes(ctx, sqsClient, sourceQueueURL)
+			require.NoError(t, err)
+
+			// Check if all messages are deleted
+			return attributes["ApproximateNumberOfMessagesNotVisible"] == "0" &&
+				attributes["ApproximateNumberOfMessages"] == "0"
+		},
+		10*time.Second,
+		200*time.Millisecond,
+	)
 }
 
 // setupQueue creates an SQS queue and returns its URL
@@ -159,9 +162,23 @@ func receiveAllMessages(ctx context.Context, client *sqs.Client, queueURL string
 	return allMessages, nil
 }
 
-// createMessageProcessor creates a stream that processes messages from SQS
+// getQueueAttributes gets all attributes of the specified queue
+func getQueueAttributes(ctx context.Context, client *sqs.Client, queueURL string) (map[string]string, error) {
+	attributes, err := client.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
+		QueueUrl: aws.String(queueURL),
+		AttributeNames: []types.QueueAttributeName{
+			types.QueueAttributeNameAll,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get queue attributes: %w", err)
+	}
+	return attributes.Attributes, nil
+}
+
+// createSqsStream creates a stream that processes messages from SQS
 // It reads from source queue, transforms messages, writes to destination queue, and deletes from source
-func createMessageProcessor(sqsClient *sqs.Client, sourceQueueURL, destQueueURL string) *core.Stream[struct{}] {
+func createSqsStream(sqsClient *sqs.Client, sourceQueueURL, destQueueURL string) *core.Stream[struct{}] {
 	// Configure source
 	sourceConfig := SourceConfig{
 		QueueURL:            sourceQueueURL,
@@ -210,8 +227,6 @@ func createMessageProcessor(sqsClient *sqs.Client, sourceQueueURL, destQueueURL 
 		transformFlow,
 		sendFlow,
 		deleteFlow,
-		sinks.CancelIf(func(msg DeleteMessageResult[SendMessageResult[types.Message]]) bool {
-			return msg.Error != nil
-		}),
+		sinks.Noop[DeleteMessageResult[SendMessageResult[types.Message]]](),
 	)
 }

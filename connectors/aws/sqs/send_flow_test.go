@@ -22,6 +22,7 @@ func TestSendFlow(t *testing.T) {
 		input           string
 		setupMocks      func(t *testing.T, mock *mocks.MockSQSSendClient)
 		expectedResults []SendMessageResult[string]
+		expectError     bool
 	}{
 		{
 			name: "successfully sends message",
@@ -49,9 +50,9 @@ func TestSendFlow(t *testing.T) {
 					Output: &sqs.SendMessageOutput{
 						MessageId: util.AsPtr("msg123"),
 					},
-					Error: nil,
 				},
 			},
+			expectError: false,
 		},
 		{
 			name: "handles error from SQS",
@@ -69,13 +70,8 @@ func TestSendFlow(t *testing.T) {
 					SendMessage(mock.Anything, expectedInput, mock.Anything).
 					Return(nil, errors.New("sqs error")).Once()
 			},
-			expectedResults: []SendMessageResult[string]{
-				{
-					Original: "test message",
-					Output:   nil,
-					Error:    errors.New("sqs error"),
-				},
-			},
+			expectedResults: nil,
+			expectError:     true,
 		},
 	}
 
@@ -108,14 +104,15 @@ func TestSendFlow(t *testing.T) {
 			// Run the stream
 			result := <-stream.Run(ctx)
 
-			// Check that the stream completed successfully
-			assert.True(t, result.Ok, "Expected stream to complete successfully")
-
-			// Get the results from the stream result
-			resultSlice := result.Value
-
-			// Compare the results using ElementsMatch
-			assert.ElementsMatch(t, tt.expectedResults, resultSlice)
+			if tt.expectError {
+				assert.False(t, result.Ok, "Expected stream to fail")
+			} else {
+				assert.True(t, result.Ok, "Expected stream to complete successfully")
+				// Get the results from the stream result
+				resultSlice := result.Value
+				// Compare the results using ElementsMatch
+				assert.ElementsMatch(t, tt.expectedResults, resultSlice)
+			}
 		})
 	}
 }

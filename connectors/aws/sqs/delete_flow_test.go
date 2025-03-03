@@ -29,6 +29,7 @@ func TestDeleteFlow(t *testing.T) {
 		input           TestMessage
 		setupMocks      func(t *testing.T, mock *mocks.MockSQSDeleteClient)
 		expectedResults []DeleteMessageResult[TestMessage]
+		expectError     bool
 	}{
 		{
 			name: "successfully deletes message",
@@ -58,9 +59,9 @@ func TestDeleteFlow(t *testing.T) {
 						Content:       "test message",
 					},
 					Output: &sqs.DeleteMessageOutput{},
-					Error:  nil,
 				},
 			},
+			expectError: false,
 		},
 		{
 			name: "handles error from SQS",
@@ -82,17 +83,8 @@ func TestDeleteFlow(t *testing.T) {
 					DeleteMessage(mock.Anything, expectedInput, mock.Anything).
 					Return(nil, errors.New("sqs error")).Once()
 			},
-			expectedResults: []DeleteMessageResult[TestMessage]{
-				{
-					Original: TestMessage{
-						ID:            "msg123",
-						ReceiptHandle: "receipt123",
-						Content:       "test message",
-					},
-					Output: nil,
-					Error:  errors.New("sqs error"),
-				},
-			},
+			expectedResults: nil,
+			expectError:     true,
 		},
 		{
 			name: "handles nil receipt handle",
@@ -107,17 +99,8 @@ func TestDeleteFlow(t *testing.T) {
 			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSDeleteClient) {
 				// No mock expectations because DeleteMessage should not be called
 			},
-			expectedResults: []DeleteMessageResult[TestMessage]{
-				{
-					Original: TestMessage{
-						ID:            "msg123",
-						ReceiptHandle: "",
-						Content:       "test message",
-					},
-					Output: nil,
-					Error:  errors.New("receipt handle is nil"),
-				},
-			},
+			expectedResults: nil,
+			expectError:     true,
 		},
 	}
 
@@ -151,14 +134,15 @@ func TestDeleteFlow(t *testing.T) {
 			// Run the stream
 			result := <-stream.Run(ctx)
 
-			// Check that the stream completed successfully
-			assert.True(t, result.Ok, "Expected stream to complete successfully")
-
-			// Get the results from the stream result
-			resultSlice := result.Value
-
-			// Compare the results using ElementsMatch
-			assert.ElementsMatch(t, tt.expectedResults, resultSlice)
+			if tt.expectError {
+				assert.False(t, result.Ok, "Expected stream to fail")
+			} else {
+				assert.True(t, result.Ok, "Expected stream to complete successfully")
+				// Get the results from the stream result
+				resultSlice := result.Value
+				// Compare the results using ElementsMatch
+				assert.ElementsMatch(t, tt.expectedResults, resultSlice)
+			}
 		})
 	}
 }

@@ -21,9 +21,6 @@ type DeleteMessageResult[I any] struct {
 
 	// The output from the SQS DeleteMessage operation
 	Output *sqs.DeleteMessageOutput
-
-	// Any error that occurred during the delete operation
-	Error error
 }
 
 // DeleteFlowConfig holds configuration for the SQS delete flow
@@ -34,8 +31,8 @@ type DeleteFlowConfig struct {
 
 // DeleteFlow creates a Flow that deletes messages from an SQS queue and passes the results downstream.
 // For each input item, it extracts the receipt handle using the provided function, deletes the message
-// from SQS, and emits a DeleteMessageResult containing the original input item, the SQS response,
-// and any error that occurred.
+// from SQS, and emits a DeleteMessageResult containing the original input item and the SQS response.
+// If an error occurs during deletion, it will be propagated through the flow's error handling mechanism.
 //
 // Type Parameters:
 //   - I: The type of input items that contain or can be used to extract receipt handles
@@ -53,17 +50,13 @@ func DeleteFlow[I any](
 	receiptHandleExtractor func(I) *string,
 	opts ...core.FlowOption,
 ) *core.Flow[I, DeleteMessageResult[I]] {
-	return flows.Map(func(elem I) DeleteMessageResult[I] {
+	return flows.TryMap(func(elem I) (DeleteMessageResult[I], error) {
 		// Extract the receipt handle from the input element
 		receiptHandle := receiptHandleExtractor(elem)
 
-		// If receipt handle is nil, create an error result
+		// If receipt handle is nil, return an error
 		if receiptHandle == nil {
-			return DeleteMessageResult[I]{
-				Original: elem,
-				Output:   nil,
-				Error:    errors.New("receipt handle is nil"),
-			}
+			return DeleteMessageResult[I]{}, errors.New("receipt handle is nil")
 		}
 
 		// Create the delete message input
@@ -74,12 +67,14 @@ func DeleteFlow[I any](
 
 		// Delete the message from SQS
 		output, err := client.DeleteMessage(context.Background(), deleteInput)
+		if err != nil {
+			return DeleteMessageResult[I]{}, err
+		}
 
 		// Create the result, including the original input item
 		return DeleteMessageResult[I]{
 			Original: elem,
 			Output:   output,
-			Error:    err,
-		}
+		}, nil
 	}, opts...)
 }

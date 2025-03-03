@@ -20,9 +20,6 @@ type SendMessageResult[I any] struct {
 
 	// The output from the SQS SendMessage operation
 	Output *sqs.SendMessageOutput
-
-	// Any error that occurred during the send operation
-	Error error
 }
 
 // SendFlowConfig holds configuration for the SQS send flow
@@ -38,7 +35,8 @@ type SendFlowConfig struct {
 
 // SendFlow creates a Flow that sends messages to an SQS queue and passes the results downstream.
 // For each input message, it sends it to SQS and emits a SendMessageResult containing the
-// original input item, the SQS response, and any error that occurred.
+// original input item and the SQS response.
+// If an error occurs during sending, it will be propagated through the flow's error handling mechanism.
 //
 // Type Parameters:
 //   - I: The type of input items that will be converted to SQS messages
@@ -56,7 +54,7 @@ func SendFlow[I any](
 	messageBuilder func(I) *sqs.SendMessageInput,
 	opts ...core.FlowOption,
 ) *core.Flow[I, SendMessageResult[I]] {
-	return flows.Map(func(elem I) SendMessageResult[I] {
+	return flows.TryMap(func(elem I) (SendMessageResult[I], error) {
 		// Build the message input from the input element
 		msgInput := messageBuilder(elem)
 
@@ -72,12 +70,14 @@ func SendFlow[I any](
 
 		// Send the message to SQS
 		output, err := client.SendMessage(context.Background(), msgInput)
+		if err != nil {
+			return SendMessageResult[I]{}, err
+		}
 
 		// Create the result, including the original input item
 		return SendMessageResult[I]{
 			Original: elem,
 			Output:   output,
-			Error:    err,
-		}
+		}, nil
 	}, opts...)
 }
