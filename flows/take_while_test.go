@@ -47,18 +47,17 @@ func TestTakeWhile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			after := make([]int, 0)
 
 			stream := compose.SourceThroughFlowToSink2(
 				sources.Slice(tt.input),
 				TakeWhile(tt.pred),
-				test.CaptureItems(&after),
+				test.CheckItems(t, func(t *testing.T, seen []int) {
+					assert.Equal(t, tt.want, seen)
+				}),
 				sinks.Noop[int](),
 			)
 
 			res := <-stream.Run(ctx)
-
-			assert.Equal(t, tt.want, after)
 			assert.True(t, res.Ok)
 		})
 	}

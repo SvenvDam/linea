@@ -1,0 +1,15 @@
+log-level: warn
+with-expecter: true
+issue-845-fix: true
+resolve-type-alias: false
+disable-version-string: true
+
+packages:
+  github.com/svenvdam/linea/connectors/aws:
+    config:
+      all: true
+      recursive: true
+      outpkg: "mocks"
+      dir: "{{ .InterfaceDirRelative }}/mocks"
+      filename: "mock_{{ snakecase .InterfaceName }}.go"
+      mockname: "Mock{{.InterfaceName}}"

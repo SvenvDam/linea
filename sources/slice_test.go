@@ -32,16 +32,16 @@ func TestSlice(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			seen := make([]int, 0)
 			stream := compose.SourceThroughFlowToSink(
 				Slice(tt.elements),
-				test.CaptureItems(&seen),
+				test.CheckItems(t, func(t *testing.T, seen []int) {
+					assert.Equal(t, tt.want, seen)
+				}),
 				sinks.Noop[int](),
 			)
 
 			res := <-stream.Run(ctx)
 			assert.True(t, res.Ok)
-			assert.Equal(t, tt.want, seen)
 		})
 	}
 }

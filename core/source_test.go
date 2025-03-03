@@ -76,7 +76,7 @@ func TestSource(t *testing.T) {
 			drain := make(chan struct{})
 
 			// Create source with test generator
-			source := NewSource(func(ctx context.Context, drain <-chan struct{}) <-chan int {
+			source := NewSource(func(ctx context.Context, drain <-chan struct{}, cancel context.CancelFunc) <-chan int {
 				return in
 			}, WithSourceBufSize(tt.bufSize))
 

@@ -81,20 +81,19 @@ func TestMapPar(t *testing.T) {
 			ctx := context.Background()
 			mapper := tt.setup()
 
-			before := make([]int, 0)
-			after := make([]string, 0)
-
 			stream := compose.SourceThroughFlowToSink3(
 				sources.Slice(tt.input),
-				test.CaptureItems(&before),
+				test.CheckItems(t, func(t *testing.T, seen []int) {
+					assert.Equal(t, tt.input, seen)
+				}),
 				MapPar(mapper, tt.parallelism),
-				test.CaptureItems(&after),
+				test.CheckItems(t, func(t *testing.T, seen []string) {
+					assert.ElementsMatch(t, tt.want, seen)
+				}),
 				sinks.Noop[string](),
 			)
 
 			res := <-stream.Run(ctx)
-			assert.ElementsMatch(t, tt.want, after)
-			assert.Equal(t, tt.input, before)
 			assert.True(t, res.Ok)
 		})
 	}

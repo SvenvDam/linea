@@ -32,14 +32,15 @@ func TestRepeat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			seen := make([]int, 0)
-
 			stream := compose.SourceThroughFlowToSink2(
 				Repeat(tt.element),
 				test.AssertEachItem(t, func(t *testing.T, in int) {
 					assert.Equal(t, tt.element, in)
 				}),
-				test.CaptureItems(&seen),
+				test.CheckItems(t, func(t *testing.T, seen []int) {
+					assert.Greater(t, len(seen), 1)
+					tt.check(t, seen)
+				}),
 				sinks.Noop[int](),
 			)
 
@@ -49,8 +50,6 @@ func TestRepeat(t *testing.T) {
 			res := <-resChan
 
 			assert.True(t, res.Ok)
-			assert.Greater(t, len(seen), 1)
-			tt.check(t, seen)
 		})
 	}
 }

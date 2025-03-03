@@ -48,21 +48,20 @@ func TestBatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			before := make([]int, 0)
-			after := make([][]int, 0)
-
 			stream := compose.SourceThroughFlowToSink3(
 				sources.Slice(tt.items),
-				test.CaptureItems(&before),
+				test.CheckItems(t, func(t *testing.T, elems []int) {
+					assert.Equal(t, tt.items, elems)
+				}),
 				Batch[int](tt.n),
-				test.CaptureItems(&after),
+				test.CheckItems(t, func(t *testing.T, elems [][]int) {
+					assert.Equal(t, tt.want, elems)
+				}),
 				sinks.Noop[[]int](),
 			)
 
 			res := <-stream.Run(ctx)
 			assert.True(t, res.Ok)
-			assert.Equal(t, tt.items, before)
-			assert.Equal(t, tt.want, after)
 		})
 	}
 }

@@ -40,16 +40,16 @@ func TestChan(t *testing.T) {
 				close(ch)
 			}()
 
-			seen := make([]int, 0)
 			stream := compose.SourceThroughFlowToSink(
 				Chan(ch),
-				test.CaptureItems(&seen),
+				test.CheckItems(t, func(t *testing.T, seen []int) {
+					assert.Equal(t, tt.want, seen)
+				}),
 				sinks.Noop[int](),
 			)
 
 			res := <-stream.Run(ctx)
 			assert.True(t, res.Ok)
-			assert.Equal(t, tt.want, seen)
 		})
 	}
 }

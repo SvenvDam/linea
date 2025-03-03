@@ -1,0 +1,24 @@
+name: Find Go Modules
+description: Find all Go modules in the repository
+
+inputs:
+  file-name:
+    description: 'File name to find'
+    required: true
+    default: 'go.mod'
+
+outputs:
+  modules:
+    description: 'JSON array of Go module directories'
+    value: ${{ steps.find-modules.outputs.modules }}
+
+runs:
+  using: composite
+  steps:
+    - name: Find Go modules
+      id: find-modules
+      shell: bash
+      run: |
+        MODULES=$(find . -name "${{ inputs.file-name }}" -type f -exec dirname {} \; | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
+        echo "modules=$MODULES" >> $GITHUB_OUTPUT
+        echo "Found modules: $MODULES"

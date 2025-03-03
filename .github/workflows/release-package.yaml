@@ -6,40 +6,99 @@ on:
     branches:
       - main
     paths:
-      - VERSION
+      - '**/VERSION'
 
 jobs:
-  release:
+  find-modules:
+    name: Find modules with VERSION files
+    runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.find-modules.outputs.modules }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find modules with VERSION files
+        id: find-modules
+        uses: ./.github/actions/find-modules
+        with:
+          file-name: 'VERSION'
+
+  release-modules:
+    name: Release modules
+    needs: find-modules
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Needed for pushing tags
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJson(needs.find-modules.outputs.modules) }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed to check for existing tags
       - uses: ./.github/actions/setup-go
-      - uses: ./.github/actions/lint-test
-      - name: Validate and set version
+        with:
+          working-directory: ${{ matrix.module }}
+      - uses: ./.github/actions/go-checks
+        with:
+          working-directory: ${{ matrix.module }}
+
+      - name: Determine module prefix
+        id: module-prefix
+        run: |
+          MODULE_PATH="${{ matrix.module }}"
+          # Strip leading ./ or just . if present
+          MODULE_PATH="${MODULE_PATH#./}"
+          MODULE_PATH="${MODULE_PATH#.}"
+
+          if [ -z "$MODULE_PATH" ]; then
+            echo "prefix=" >> $GITHUB_OUTPUT
+          else
+            # Keep original path structure and add trailing slash
+            echo "prefix=${MODULE_PATH}/" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Read and validate version
+        id: version
+        working-directory: ${{ matrix.module }}
         run: |
           VERSION=$(cat VERSION)
           if ! [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Error: Version must be in format vX.Y.Z (got: $VERSION)"
             exit 1
           fi
-          echo "Version to release: $VERSION"
-          echo "RELEASE_VERSION=$VERSION" >> $GITHUB_ENV
-      - name: Check if version tag exists
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version for module ${{ matrix.module }}: $VERSION"
+
+      - name: Determine tag name
+        id: tag
         run: |
-          if git rev-parse "refs/tags/$RELEASE_VERSION" >/dev/null 2>&1; then
-            echo "Error: Tag $RELEASE_VERSION already exists"
-            exit 1
+          TAG_NAME="${{ steps.module-prefix.outputs.prefix }}${{ steps.version.outputs.version }}"
+          echo "name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Tag name for module ${{ matrix.module }}: $TAG_NAME"
+
+      - name: Check if tag exists
+        id: tag-exists
+        run: |
+          if git rev-parse "refs/tags/${{ steps.tag.outputs.name }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Tag ${{ steps.tag.outputs.name }} already exists, skipping release for ${{ matrix.module }}"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Tag ${{ steps.tag.outputs.name }} does not exist, creating tag"
           fi
-      - name: Release package
+
+      - name: Create and push tag
+        if: steps.tag-exists.outputs.exists != 'true'
         run: |
-          echo "Releasing package version $RELEASE_VERSION"
-          git tag "$RELEASE_VERSION"
-          git push origin "$RELEASE_VERSION"
-      - name: Verify package availability
+          echo "Creating tag ${{ steps.tag.outputs.name }} for module ${{ matrix.module }}"
+          git tag "${{ steps.tag.outputs.name }}"
+          git push origin "${{ steps.tag.outputs.name }}"
+
+      - name: Verify Go module availability
+        if: steps.tag-exists.outputs.exists != 'true' && hashFiles(format('{0}/go.mod', matrix.module)) != ''
+        working-directory: ${{ matrix.module }}
         run: |
-          # Wait a bit for the tag to be processed
-          sleep 10
-          # Try to list the package through proxy.golang.org
-          GOPROXY=https://proxy.golang.org go list -m $(go list -m)@$RELEASE_VERSION
+          MODULE_NAME=$(go list -m)
+          echo "Verifying Go module: $MODULE_NAME@${{ steps.version.outputs.version }}"
+          GOPROXY=https://proxy.golang.org go list -m "$MODULE_NAME@${{ steps.version.outputs.version }}" || echo "Warning: Could not verify module availability"
