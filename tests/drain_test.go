@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/svenvdam/linea/compose"
+	"github.com/svenvdam/linea/flows"
 	"github.com/svenvdam/linea/sinks"
 	"github.com/svenvdam/linea/sources"
 )
@@ -29,8 +30,9 @@ func TestDrain(t *testing.T) {
 			ctx := context.Background()
 			ctx = tt.setup(ctx)
 
-			stream := compose.SourceToSink(
+			stream := compose.SourceThroughFlowToSink(
 				sources.Repeat(1),
+				flows.Map(func(i int) int { return i * 2 }),
 				sinks.Slice[int](),
 			)
 
@@ -39,7 +41,7 @@ func TestDrain(t *testing.T) {
 			select {
 			case <-resChan:
 				assert.Fail(t, "stream should not have any results")
-			case <-time.After(20 * time.Millisecond):
+			case <-time.After(50 * time.Millisecond):
 			}
 
 			stream.Drain()
@@ -47,7 +49,7 @@ func TestDrain(t *testing.T) {
 			res := <-resChan
 			stream.AwaitDone()
 			assert.True(t, res.Ok)
-			assert.NotEmpty(t, res.Value)
+			assert.Greater(t, len(res.Value), 5)
 
 			_, ok := <-resChan
 			assert.False(t, ok)
