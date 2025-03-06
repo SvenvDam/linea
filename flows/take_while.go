@@ -22,7 +22,7 @@ func TakeWhile[I any](
 	pred func(I) bool,
 	opts ...core.FlowOption,
 ) *core.Flow[I, I] {
-	return core.NewFlow(func(ctx context.Context, elem I, out chan<- I, cancel context.CancelFunc) bool {
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- I, cancel context.CancelFunc, complete core.CompleteFunc) bool {
 		if !pred(elem) {
 			return false
 		}

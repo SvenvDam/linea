@@ -23,7 +23,7 @@ func ForEach[I any](
 	fn func(I),
 	opts ...core.FlowOption,
 ) *core.Flow[I, I] {
-	return core.NewFlow(func(ctx context.Context, elem I, out chan<- I, cancel context.CancelFunc) bool {
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- I, cancel context.CancelFunc, complete core.CompleteFunc) bool {
 		fn(elem)
 		util.Send(ctx, elem, out)
 		return true

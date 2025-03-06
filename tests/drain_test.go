@@ -45,11 +45,13 @@ func TestDrain(t *testing.T) {
 			stream.Drain()
 
 			res := <-resChan
+			stream.AwaitDone()
 			assert.True(t, res.Ok)
 			assert.NotEmpty(t, res.Value)
 
 			_, ok := <-resChan
 			assert.False(t, ok)
+
 		})
 	}
 }

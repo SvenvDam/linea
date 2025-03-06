@@ -7,16 +7,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/svenvdam/linea/util"
 )
 
 func TestConnectFlows(t *testing.T) {
 	// Create two simple flows: int -> string -> int
-	flow1 := NewFlow(func(ctx context.Context, elem int, out chan<- string, cancel context.CancelFunc) bool {
+	flow1 := NewFlow(func(ctx context.Context, elem int, out chan<- string, cancel context.CancelFunc, complete CompleteFunc) bool {
 		out <- strconv.Itoa(elem)
 		return true
 	}, func(ctx context.Context, out chan<- string) {})
 
-	flow2 := NewFlow(func(ctx context.Context, elem string, out chan<- int, cancel context.CancelFunc) bool {
+	flow2 := NewFlow(func(ctx context.Context, elem string, out chan<- int, cancel context.CancelFunc, complete CompleteFunc) bool {
 		val, _ := strconv.Atoi(elem)
 		out <- val * 2
 		return true
@@ -30,9 +31,13 @@ func TestConnectFlows(t *testing.T) {
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	completeChan, _ := util.NewCompleteChannel()
+	setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan int {
+		return in
+	}
 
 	// Set up the combined flow
-	out := combined.setup(ctx, cancel, &wg, in)
+	out := combined.setup(ctx, cancel, &wg, completeChan, setup)
 
 	// Test the transformation
 	go func() {
@@ -61,7 +66,7 @@ func TestAppendFlowToSource(t *testing.T) {
 	})
 
 	// Create a flow that doubles the number
-	flow := NewFlow(func(ctx context.Context, elem int, out chan<- int, cancel context.CancelFunc) bool {
+	flow := NewFlow(func(ctx context.Context, elem int, out chan<- int, cancel context.CancelFunc, complete CompleteFunc) bool {
 		out <- elem * 2
 		return true
 	}, func(ctx context.Context, out chan<- int) {})
@@ -87,14 +92,14 @@ func TestAppendFlowToSource(t *testing.T) {
 
 func TestPrependFlowToSink(t *testing.T) {
 	// Create a flow that converts int to string
-	flow := NewFlow(func(ctx context.Context, elem int, out chan<- string, cancel context.CancelFunc) bool {
+	flow := NewFlow(func(ctx context.Context, elem int, out chan<- string, cancel context.CancelFunc, complete CompleteFunc) bool {
 		out <- strconv.Itoa(elem)
 		return true
 	}, func(ctx context.Context, out chan<- string) {})
 
 	// Create a sink that concatenates strings
 	sink := NewSink("",
-		func(ctx context.Context, elem string, acc string, cancel context.CancelFunc) string {
+		func(ctx context.Context, elem string, acc string, cancel context.CancelFunc, complete CompleteFunc) string {
 			return acc + elem
 		},
 	)
@@ -107,7 +112,11 @@ func TestPrependFlowToSink(t *testing.T) {
 	defer cancel()
 	var wg sync.WaitGroup
 	in := make(chan int)
-	out := combined.setup(ctx, cancel, &wg, in)
+	completeChan, _ := util.NewCompleteChannel()
+	setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan int {
+		return in
+	}
+	out := combined.setup(ctx, cancel, &wg, completeChan, setup)
 
 	// Test the transformation
 	go func() {
@@ -137,7 +146,7 @@ func TestConnectSourceToSink(t *testing.T) {
 
 	// Create a sink that converts to string
 	sink := NewSink("",
-		func(ctx context.Context, elem int, acc string, cancel context.CancelFunc) string {
+		func(ctx context.Context, elem int, acc string, cancel context.CancelFunc, complete CompleteFunc) string {
 			return acc + strconv.Itoa(elem)
 		},
 	)

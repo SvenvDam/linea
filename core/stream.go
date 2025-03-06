@@ -18,46 +18,47 @@ import (
 // Fields:
 //   - isRunning: Indicates whether the stream is currently executing
 //   - cancel: Function to cancel stream execution
-//   - drain: Channel used to signal graceful shutdown
+//   - complete: Channel used to signal graceful shutdown to all components in the pipeline
 //   - wg: WaitGroup to coordinate goroutine completion
 //   - res: Channel that receives the stream results
 //   - run: Function called to initialize and start the stream
 type Stream[R any] struct {
 	isRunning atomic.Bool
 	cancel    context.CancelFunc
-	drain     chan struct{}
+	complete  context.CancelFunc
 	wg        *sync.WaitGroup
 	res       <-chan Result[R]
 	run       func(
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
-		drain chan struct{},
+		complete <-chan struct{},
 	)
 }
 
 // newStream creates a new Stream with the provided setup function.
 //
 // Parameters:
-//   - setup: Function that sets up and coordinates the stream execution,
-//     including goroutine management and result channel initialization
+//   - setup: Function that sets up and coordinates the stream execution.
+//
+// The setup function receives:
+//   - ctx: Context used to control cancellation
+//   - cancel: Function to cancel execution
+//   - wg: WaitGroup to coordinate goroutine completion
+//   - complete: Channel used to signal graceful shutdown
+//     It returns a channel that receives the stream's results
 //
 // Type Parameters:
 //   - R: The type of the final result produced by the stream
 //
 // Returns a configured Stream ready to be run.
 func newStream[R any](
-	setup func(
-		ctx context.Context,
-		cancel context.CancelFunc,
-		wg *sync.WaitGroup,
-		drain chan struct{},
-	) <-chan R,
+	setup setupFunc[R],
 ) *Stream[R] {
 	stream := &Stream[R]{
 		isRunning: atomic.Bool{},
 		cancel:    nil,
-		drain:     make(chan struct{}),
+		complete:  nil,
 		wg:        &sync.WaitGroup{},
 		res:       nil,
 	}
@@ -69,9 +70,9 @@ func newStream[R any](
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
-		drain chan struct{},
+		complete <-chan struct{},
 	) {
-		res := setup(ctx, cancel, wg, drain)
+		res := setup(ctx, cancel, wg, complete)
 		stream.isRunning.Store(true)
 
 		wg.Add(1)
@@ -109,7 +110,10 @@ func (s *Stream[R]) Run(ctx context.Context) <-chan Result[R] {
 	if !s.isRunning.Load() {
 		ctx, cancel := context.WithCancel(ctx)
 		s.cancel = cancel
-		s.run(ctx, cancel, s.wg, s.drain)
+
+		complete, completeFn := util.NewCompleteChannel()
+		s.complete = completeFn
+		s.run(ctx, cancel, s.wg, complete)
 	}
 
 	return s.res
@@ -120,7 +124,6 @@ func (s *Stream[R]) Run(ctx context.Context) <-chan Result[R] {
 func (s *Stream[R]) Cancel() {
 	if s.isRunning.Load() {
 		s.cancel()
-		s.wg.Wait()
 	}
 }
 
@@ -130,6 +133,16 @@ func (s *Stream[R]) Cancel() {
 // processed, continue reading from the stream's result channel until it closes.
 func (s *Stream[R]) Drain() {
 	if s.isRunning.Load() {
-		close(s.drain)
+		s.complete()
+	}
+}
+
+// AwaitDone blocks until all goroutines in the stream have completed.
+// Use this method to wait for all processing to finish after calling Cancel or Drain.
+// It waits on the internal sync.WaitGroup that is passed to all setup functions
+// in the pipeline to coordinate goroutine completion.
+func (s *Stream[R]) AwaitDone() {
+	if s.isRunning.Load() {
+		s.wg.Wait()
 	}
 }

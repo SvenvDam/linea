@@ -21,7 +21,7 @@ import (
 func Flatten[I any](
 	opts ...core.FlowOption,
 ) *core.Flow[[]I, I] {
-	return core.NewFlow(func(ctx context.Context, elem []I, out chan<- I, cancel context.CancelFunc) bool {
+	return core.NewFlow(func(ctx context.Context, elem []I, out chan<- I, cancel context.CancelFunc, complete core.CompleteFunc) bool {
 		util.SendMany(ctx, elem, out)
 		return true
 	}, func(ctx context.Context, out chan<- I) {}, opts...)

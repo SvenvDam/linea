@@ -21,7 +21,7 @@ func Chan[O any](
 	ch <-chan O,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context, drain <-chan struct{}, cancel context.CancelFunc) <-chan O {
+	return core.NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc) <-chan O {
 		return ch
 	}, opts...)
 }

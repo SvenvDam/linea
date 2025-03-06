@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/svenvdam/linea/util"
 )
 
 func TestFlow(t *testing.T) {
@@ -98,11 +99,15 @@ func TestFlow(t *testing.T) {
 
 			wg := &sync.WaitGroup{}
 			in := make(chan int)
+			complete := make(chan struct{})
+			setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan int {
+				return in
+			}
 
 			// Create flow that converts ints to strings
 			flow := NewFlow[int, string](
 				// onElem function
-				func(ctx context.Context, elem int, out chan<- string, cancel context.CancelFunc) bool {
+				func(ctx context.Context, elem int, out chan<- string, cancel context.CancelFunc, complete CompleteFunc) bool {
 					if elem == -1 {
 						return false
 					}
@@ -117,7 +122,7 @@ func TestFlow(t *testing.T) {
 			)
 
 			// Start flow
-			out := flow.setup(ctx, cancel, wg, in)
+			out := flow.setup(ctx, cancel, wg, complete, setup)
 
 			// Give flow time to start
 			time.Sleep(20 * time.Millisecond)
@@ -164,10 +169,15 @@ func TestFlowOnDone(t *testing.T) {
 
 			wg := &sync.WaitGroup{}
 			in := make(chan int)
+			completeChan, _ := util.NewCompleteChannel()
+
+			setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan int {
+				return in
+			}
 			onDoneCalled := false
 
 			flow := NewFlow[int, string](
-				func(ctx context.Context, elem int, out chan<- string, cancel context.CancelFunc) bool {
+				func(ctx context.Context, elem int, out chan<- string, cancel context.CancelFunc, complete CompleteFunc) bool {
 					return elem != -1
 				},
 				func(ctx context.Context, out chan<- string) {
@@ -175,7 +185,7 @@ func TestFlowOnDone(t *testing.T) {
 				},
 			)
 
-			out := flow.setup(ctx, cancel, wg, in)
+			out := flow.setup(ctx, cancel, wg, completeChan, setup)
 
 			time.Sleep(20 * time.Millisecond)
 			tt.triggerMethod(in, cancel)

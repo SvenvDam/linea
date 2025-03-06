@@ -15,13 +15,22 @@ import (
 //   - R: The type of the final result
 //
 // Fields:
-//   - setup: Function called to initialize and start the sink
+//   - setup: Function called to initialize and start the sink. It receives:
+//   - ctx: Context used to control cancellation
+//   - cancel: Function to cancel execution
+//   - wg: WaitGroup to coordinate goroutine completion
+//   - complete: Channel used to signal graceful shutdown, when closed the sink
+//     will stop accepting new items but continue processing remaining ones
+//   - setupUpstream: The setup function of the upstream component, allowing composition
+//     of pipeline components through function composition
+//     The setup function returns a channel that provides the sink's final result
 type Sink[I, R any] struct {
 	setup func(
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
-		in <-chan I,
+		complete <-chan struct{},
+		setupUpstream setupFunc[I],
 	) <-chan R
 }
 
@@ -43,6 +52,7 @@ type Sink[I, R any] struct {
 //   - in: The current input element
 //   - acc: The current accumulator value
 //   - cancel: Function to cancel the sink's context
+//   - complete: Function to signal upstream that processing is complete
 //
 // onElem returns the new accumulator value
 //
@@ -54,15 +64,20 @@ type Sink[I, R any] struct {
 //   - A configured Sink ready to be connected to a stream
 func NewSink[I, R any](
 	initial R,
-	onElem func(ctx context.Context, in I, acc R, cancel context.CancelFunc) R,
+	onElem func(ctx context.Context, in I, acc R, cancel context.CancelFunc, complete CompleteFunc) R,
 ) *Sink[I, R] {
 	setup := func(
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
-		in <-chan I,
+		complete <-chan struct{},
+		setupUpstream setupFunc[I],
 	) <-chan R {
 		out := make(chan R)
+
+		completeUpstreamChan, completeUpstream := util.NewCompleteChannel()
+
+		in := setupUpstream(ctx, cancel, wg, completeUpstreamChan)
 
 		wg.Add(1)
 		go func() {
@@ -74,12 +89,14 @@ func NewSink[I, R any](
 				case <-ctx.Done():
 					util.Send(ctx, acc, out)
 					return
+				case <-complete:
+					completeUpstream()
 				case elem, ok := <-in:
 					if !ok {
 						util.Send(ctx, acc, out)
 						return
 					}
-					acc = onElem(ctx, elem, acc, cancel)
+					acc = onElem(ctx, elem, acc, cancel, completeUpstream)
 				}
 			}
 		}()

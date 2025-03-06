@@ -21,7 +21,7 @@ func Slice[O any](
 	slice []O,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context, drain <-chan struct{}, cancel context.CancelFunc) <-chan O {
+	return core.NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc) <-chan O {
 		out := make(chan O)
 		go func() {
 			defer close(out)
@@ -29,7 +29,7 @@ func Slice[O any](
 				select {
 				case <-ctx.Done():
 					return
-				case <-drain:
+				case <-complete:
 					return
 				case out <- elem:
 				}

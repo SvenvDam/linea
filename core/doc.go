@@ -10,6 +10,13 @@
 //   - Sink: Consumes items and produces a final result
 //   - Stream: Coordinates the execution of a complete pipeline
 //
+// Core Concepts:
+//   - Setup Functions: Each component provides a setup function that initializes its
+//     execution, receives context, cancellation, and completion signals, and returns
+//     a channel for its output. These functions are composed when connecting components.
+//   - Complete Signal Channels: Used to signal graceful shutdown through the pipeline.
+//     When closed, components stop accepting new items but process remaining ones.
+//
 // While this package provides the building blocks for custom components, most users
 // should prefer the pre-built components from the specialized packages:
 //   - sources: Ready-to-use Source implementations (Slice, Chan, Repeat, etc.)

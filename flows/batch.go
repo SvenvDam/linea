@@ -24,7 +24,7 @@ func Batch[I any](
 	opts ...core.FlowOption,
 ) *core.Flow[I, []I] {
 	batch := make([]I, 0, n)
-	return core.NewFlow(func(ctx context.Context, elem I, out chan<- []I, cancel context.CancelFunc) bool {
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- []I, cancel context.CancelFunc, complete core.CompleteFunc) bool {
 		batch = append(batch, elem)
 		if len(batch) == n {
 			util.Send(ctx, batch, out)

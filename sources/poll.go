@@ -33,7 +33,7 @@ func Poll[O any](
 	interval time.Duration,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context, drain <-chan struct{}, cancel context.CancelFunc) <-chan O {
+	return core.NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc) <-chan O {
 		out := make(chan O)
 		go func() {
 			defer close(out)
@@ -76,7 +76,7 @@ func Poll[O any](
 				select {
 				case <-ctx.Done():
 					return
-				case <-drain:
+				case <-complete:
 					return
 				case <-ticker.C:
 					shouldPoll.Store(true)

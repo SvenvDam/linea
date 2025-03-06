@@ -29,7 +29,7 @@ func MapPar[I, O any](
 ) *core.Flow[I, O] {
 	sem := make(chan struct{}, parallelism)
 	wg := sync.WaitGroup{}
-	return core.NewFlow(func(ctx context.Context, elem I, out chan<- O, cancel context.CancelFunc) bool {
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- O, cancel context.CancelFunc, complete core.CompleteFunc) bool {
 		sem <- struct{}{} // wait for a slot
 		wg.Add(1)
 		go func() {

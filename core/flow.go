@@ -3,6 +3,8 @@ package core
 import (
 	"context"
 	"sync"
+
+	"github.com/svenvdam/linea/util"
 )
 
 // Flow represents a transformation stage in a data processing pipeline.
@@ -14,13 +16,24 @@ import (
 //   - O: The type of output items the Flow produces
 //
 // Fields:
-//   - setup: A function that initializes the Flow's goroutine and connects it to the input channel
+//   - setup: A function that initializes the Flow's goroutine and connects it to the input channel.
+//
+// It receives:
+//   - ctx: Context used to control cancellation
+//   - cancel: Function to cancel execution
+//   - wg: WaitGroup to coordinate goroutine completion
+//   - complete: Channel used to signal graceful shutdown, when closed the flow
+//     will stop accepting new items but continue processing remaining ones
+//   - setupUpstream: The setup function of the upstream component, allowing composition
+//     of pipeline components through function composition
+//     The setup function returns a channel that provides the flow's output items
 type Flow[I, O any] struct {
 	setup func(
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
-		in <-chan I,
+		complete <-chan struct{},
+		setupUpstream setupFunc[I],
 	) <-chan O
 }
 
@@ -69,7 +82,7 @@ func WithFlowBufSize(size int) FlowOption {
 //   - Sending the transformed item to the output channel
 //   - Returning true to continue processing, false to stop the flow
 //
-// # It receives the current context, input element, output channel, and cancel function
+// # It receives the current context, input element, output channel, cancel function, and complete function
 //
 // onDone is responsible for:
 //   - Performing final operations and cleanup
@@ -85,7 +98,7 @@ func WithFlowBufSize(size int) FlowOption {
 // Returns:
 //   - A new Flow instance that will perform the specified transformation
 func NewFlow[I, O any](
-	onElem func(ctx context.Context, elem I, out chan<- O, cancel context.CancelFunc) bool,
+	onElem func(ctx context.Context, elem I, out chan<- O, cancel context.CancelFunc, complete CompleteFunc) bool,
 	onDone func(ctx context.Context, out chan<- O),
 	opts ...FlowOption,
 ) *Flow[I, O] {
@@ -100,27 +113,31 @@ func NewFlow[I, O any](
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
-		in <-chan I,
+		complete <-chan struct{},
+		setupUpstream setupFunc[I],
 	) <-chan O {
 		out := make(chan O, cfg.bufSize)
+		completeUpstreamChan, completeUpstream := util.NewCompleteChannel()
+		in := setupUpstream(ctx, cancel, wg, completeUpstreamChan)
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			defer close(out)
+			defer onDone(ctx, out)
 			for {
 				select {
 				case <-ctx.Done():
-					onDone(ctx, out)
 					return
+				case <-complete:
+					completeUpstream()
 				case elem, ok := <-in:
 					if !ok {
-						onDone(ctx, out)
 						return
 					}
-					ok = onElem(ctx, elem, out, cancel)
+					ok = onElem(ctx, elem, out, cancel, completeUpstream)
 					if !ok {
-						onDone(ctx, out)
+						completeUpstream()
 						return
 					}
 				}

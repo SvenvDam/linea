@@ -26,10 +26,18 @@ func ConnectFlows[I, O1, O2 any](
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
-		in <-chan I,
+		complete <-chan struct{},
+		setupUpstream setupFunc[I],
 	) <-chan O2 {
-		link := flow1.setup(ctx, cancel, wg, in)
-		return flow2.setup(ctx, cancel, wg, link)
+		return flow2.setup(
+			ctx,
+			cancel,
+			wg,
+			complete,
+			func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete_ <-chan struct{}) <-chan O1 {
+				return flow1.setup(ctx, cancel, wg, complete_, setupUpstream)
+			},
+		)
 	}
 
 	return &Flow[I, O2]{
@@ -54,10 +62,9 @@ func AppendFlowToSource[I, O any](source *Source[I], flow *Flow[I, O]) *Source[O
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
-		drain chan struct{},
+		complete <-chan struct{},
 	) <-chan O {
-		link := source.setup(ctx, cancel, wg, drain)
-		return flow.setup(ctx, cancel, wg, link)
+		return flow.setup(ctx, cancel, wg, complete, source.setup)
 	}
 
 	return &Source[O]{
@@ -84,10 +91,18 @@ func PrependFlowToSink[I, O, R any](flow *Flow[I, O], sink *Sink[O, R]) *Sink[I,
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
-		in <-chan I,
+		complete <-chan struct{},
+		setupUpstream setupFunc[I],
 	) <-chan R {
-		link := flow.setup(ctx, cancel, wg, in)
-		return sink.setup(ctx, cancel, wg, link)
+		return sink.setup(
+			ctx,
+			cancel,
+			wg,
+			complete,
+			func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete_ <-chan struct{}) <-chan O {
+				return flow.setup(ctx, cancel, wg, complete_, setupUpstream)
+			},
+		)
 	}
 
 	return &Sink[I, R]{
@@ -113,10 +128,9 @@ func ConnectSourceToSink[I, R any](source *Source[I], sink *Sink[I, R]) *Stream[
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
-		drain chan struct{},
+		complete <-chan struct{},
 	) <-chan R {
-		link := source.setup(ctx, cancel, wg, drain)
-		return sink.setup(ctx, cancel, wg, link)
+		return sink.setup(ctx, cancel, wg, complete, source.setup)
 	}
 
 	return newStream(setup)

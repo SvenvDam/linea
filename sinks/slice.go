@@ -16,7 +16,7 @@ import (
 func Slice[I any]() *core.Sink[I, []I] {
 	return core.NewSink(
 		make([]I, 0),
-		func(ctx context.Context, in I, acc []I, cancel context.CancelFunc) []I {
+		func(ctx context.Context, in I, acc []I, cancel context.CancelFunc, complete core.CompleteFunc) []I {
 			return append(acc, in)
 		},
 	)

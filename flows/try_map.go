@@ -25,7 +25,7 @@ func TryMap[I, O any](
 	fn func(I) (O, error),
 	opts ...core.FlowOption,
 ) *core.Flow[I, O] {
-	return core.NewFlow(func(ctx context.Context, elem I, out chan<- O, cancel context.CancelFunc) bool {
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- O, cancel context.CancelFunc, complete core.CompleteFunc) bool {
 		result, err := fn(elem)
 		if err != nil {
 			cancel()
