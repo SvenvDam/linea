@@ -64,6 +64,39 @@ func WithFlowBufSize(size int) FlowOption {
 	}
 }
 
+// DefaultFlowErrorHandler is the default implementation for handling errors in a Flow.
+// It sends the error downstream and stops the flow by returning false.
+//
+// Parameters:
+//   - ctx: Context used for cancellation
+//   - err: The error that occurred
+//   - out: Channel to send output items
+//   - cancel: Function to cancel execution
+//   - complete: Function to signal graceful shutdown
+//
+// Returns:
+//   - false to stop the flow
+func DefaultFlowErrorHandler[O any](
+	ctx context.Context,
+	err error,
+	out chan<- Item[O],
+	cancel context.CancelFunc,
+	complete CompleteFunc,
+) bool {
+	util.Send(ctx, Item[O]{Err: err}, out)
+	return false
+}
+
+// DefaultFlowDoneHandler is the default implementation for cleanup when a Flow completes.
+// It performs no operations and is used when no custom cleanup is needed.
+//
+// Parameters:
+//   - ctx: Context used for cancellation
+//   - out: Channel to send any final output items
+func DefaultFlowDoneHandler[O any](ctx context.Context, out chan<- Item[O]) {
+	// No operation by default
+}
+
 // NewFlow creates a new Flow that transforms input items to output items using
 // the provided process function.
 //
@@ -115,14 +148,11 @@ func NewFlow[I, O any](
 	cfg := &flowConfig{}
 
 	if onErr == nil {
-		onErr = func(ctx context.Context, err error, out chan<- Item[O], cancel context.CancelFunc, complete CompleteFunc) bool {
-			util.Send(ctx, Item[O]{Err: err}, out)
-			return false
-		}
+		onErr = DefaultFlowErrorHandler[O]
 	}
 
 	if onDone == nil {
-		onDone = func(ctx context.Context, out chan<- Item[O]) {}
+		onDone = DefaultFlowDoneHandler[O]
 	}
 
 	// Apply all options

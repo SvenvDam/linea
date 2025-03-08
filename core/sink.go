@@ -34,6 +34,29 @@ type Sink[I, R any] struct {
 	) <-chan Item[R]
 }
 
+// DefaultSinkErrorHandler is the default implementation for handling errors in a Sink.
+// It returns the error as-is and stops further processing by returning false.
+//
+// Parameters:
+//   - ctx: Context used for cancellation
+//   - err: The error that occurred
+//   - acc: The current accumulator value
+//   - cancel: Function to cancel execution
+//   - complete: Function to signal graceful shutdown
+//
+// Returns:
+//   - The original error
+//   - false to stop processing
+func DefaultSinkErrorHandler[R any](
+	ctx context.Context,
+	err error,
+	acc R,
+	cancel context.CancelFunc,
+	complete CompleteFunc,
+) (error, bool) {
+	return err, false
+}
+
 // NewSink creates a terminal component in a data processing pipeline that consumes incoming data
 // and produces a final result. It acts as an accumulator, processing each incoming item
 // and updating a result value.
@@ -83,9 +106,7 @@ func NewSink[I, R any](
 	onErr func(ctx context.Context, err error, acc R, cancel context.CancelFunc, complete CompleteFunc) (error, bool),
 ) *Sink[I, R] {
 	if onErr == nil {
-		onErr = func(ctx context.Context, err error, acc R, cancel context.CancelFunc, complete CompleteFunc) (error, bool) {
-			return err, false
-		}
+		onErr = DefaultSinkErrorHandler[R]
 	}
 
 	setup := func(
