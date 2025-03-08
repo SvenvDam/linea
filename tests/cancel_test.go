@@ -63,11 +63,7 @@ func TestCancel(t *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 			stream.Drain()
 			res := <-resChan
-			if tt.expectedErr != nil {
-				assert.ErrorIs(t, res.Err, tt.expectedErr)
-			} else {
-				assert.NoError(t, res.Err)
-			}
+			assert.Equal(t, tt.expectedErr, res.Err)
 		})
 	}
 }
