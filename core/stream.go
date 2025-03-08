@@ -178,7 +178,5 @@ func (s *Stream[R]) Drain() {
 //
 // If the stream is not running, this method returns immediately.
 func (s *Stream[R]) AwaitDone() {
-	if s.isRunning.Load() {
-		s.wg.Wait()
-	}
+	s.wg.Wait()
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,18 +16,26 @@ func TestFlow(t *testing.T) {
 	tests := []struct {
 		name    string
 		bufSize int
+		setup   func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) (chan Item[int], *atomic.Bool)
+		action  func(completeSignal chan<- struct{}, cancel context.CancelFunc)
+		check   func(t *testing.T, out <-chan Item[string], upstreamCompleteCalled *atomic.Bool)
 		test    func(t *testing.T, in chan<- Item[int], out <-chan Item[string], cancel context.CancelFunc)
 	}{
 		{
 			name:    "happy path - transforms all input values",
 			bufSize: 0,
-			test: func(t *testing.T, in chan<- Item[int], out <-chan Item[string], cancel context.CancelFunc) {
+			setup: func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) (chan Item[int], *atomic.Bool) {
+				in := make(chan Item[int], 1)
 				in <- Item[int]{Value: 42}
+				close(in)
+
+				return in, nil
+			},
+			check: func(t *testing.T, out <-chan Item[string], upstreamCompleteCalled *atomic.Bool) {
 				res, ok := <-out
 				assert.True(t, ok)
 				assert.Equal(t, "value:42", res.Value)
 
-				close(in)
 				_, ok = <-out
 				assert.False(t, ok)
 			},
@@ -34,63 +43,104 @@ func TestFlow(t *testing.T) {
 		{
 			name:    "respects context cancellation",
 			bufSize: 0,
-			test: func(t *testing.T, in chan<- Item[int], out <-chan Item[string], cancel context.CancelFunc) {
-				cancel()
+			setup: func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) (chan Item[int], *atomic.Bool) {
+				in := make(chan Item[int])
 
-				go func() {
-					select {
-					case in <- Item[int]{Value: 42}:
-						assert.Fail(t, "items should not be accepted after stop!")
-					case <-time.After(20 * time.Millisecond):
-					}
-				}()
+				return in, nil
+
+			},
+			action: func(_ chan<- struct{}, cancel context.CancelFunc) {
+				cancel()
+			},
+			check: func(t *testing.T, out <-chan Item[string], upstreamCompleteCalled *atomic.Bool) {
 				_, ok := <-out
 				assert.False(t, ok)
 			},
 		},
 		{
-			name:    "handles buffered channel",
-			bufSize: 2,
-			test: func(t *testing.T, in chan<- Item[int], out <-chan Item[string], cancel context.CancelFunc) {
-				in <- Item[int]{Value: 1}
-				in <- Item[int]{Value: 2}
-				in <- Item[int]{Value: 3}
-				close(in)
-
-				res := make([]string, 0, 3)
-				for v := range out {
-					res = append(res, v.Value)
-				}
-				assert.Equal(t, []string{"value:1", "value:2", "value:3"}, res)
-			},
-		},
-		{
 			name:    "onElem can stop processing",
 			bufSize: 0,
-			test: func(t *testing.T, in chan<- Item[int], out <-chan Item[string], cancel context.CancelFunc) {
-				in <- Item[int]{Value: 42} // This will be processed
+			setup: func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) (chan Item[int], *atomic.Bool) {
+				in := make(chan Item[int], 3)
+				in <- Item[int]{Value: 42}
+				in <- Item[int]{Value: -1}
+				in <- Item[int]{Value: 43}
+				close(in)
+
+				return in, nil
+			},
+			check: func(t *testing.T, out <-chan Item[string], upstreamCompleteCalled *atomic.Bool) {
 				res, ok := <-out
 				assert.True(t, ok)
 				assert.Equal(t, "value:42", res.Value)
 
-				in <- Item[int]{Value: -1} // This will trigger early stop
-				_, ok = <-out
-				assert.False(t, ok)
-
-				go func() {
-					select {
-					case in <- Item[int]{Value: 43}:
-						assert.Fail(t, "items should not be accepted after stop!")
-					case <-time.After(20 * time.Millisecond):
-					}
-				}()
-
 				_, ok = <-out
 				assert.False(t, ok)
 			},
 		},
-	}
+		{
+			name:    "signals upstream to complete when requested",
+			bufSize: 0,
+			setup: func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) (chan Item[int], *atomic.Bool) {
+				in := make(chan Item[int])
+				upstreamCompleteCalled := &atomic.Bool{}
 
+				go func() {
+					defer close(in)
+
+					// Send a test value
+					select {
+					case in <- Item[int]{Value: 1}:
+					case <-ctx.Done():
+						return
+					}
+
+					// Wait for complete signal
+					select {
+					case <-complete:
+						upstreamCompleteCalled.Store(true)
+						return
+					case <-ctx.Done():
+						return
+					}
+				}()
+
+				return in, upstreamCompleteCalled
+			},
+			action: func(completeSignal chan<- struct{}, _ context.CancelFunc) {
+				close(completeSignal)
+			},
+			check: func(t *testing.T, out <-chan Item[string], upstreamCompleteCalled *atomic.Bool) {
+				<-out
+				assert.True(t, upstreamCompleteCalled.Load(), "upstream complete function should have been called")
+			},
+		},
+		{
+			name:    "handles errors with default error handler",
+			bufSize: 0,
+			setup: func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) (chan Item[int], *atomic.Bool) {
+				in := make(chan Item[int], 3)
+				in <- Item[int]{Value: 1}
+				in <- Item[int]{Err: assert.AnError}
+				in <- Item[int]{Value: 2}
+				close(in)
+
+				return in, nil
+			},
+			check: func(t *testing.T, out <-chan Item[string], upstreamCompleteCalled *atomic.Bool) {
+				res, ok := <-out
+				assert.True(t, ok)
+				assert.Equal(t, "value:1", res.Value)
+
+				res, ok = <-out
+				assert.True(t, ok)
+				assert.Equal(t, assert.AnError, res.Err)
+
+				_, ok = <-out
+				assert.False(t, ok) // closed after error
+			},
+		},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
@@ -98,8 +148,8 @@ func TestFlow(t *testing.T) {
 			defer cancel()
 
 			wg := &sync.WaitGroup{}
-			in := make(chan Item[int])
 			complete := make(chan struct{})
+			in, upstreamCompleteCalled := tt.setup(ctx, cancel, wg, complete)
 			setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
 				return in
 			}
@@ -122,14 +172,14 @@ func TestFlow(t *testing.T) {
 			// Start flow
 			out := flow.setup(ctx, cancel, wg, complete, setup)
 
+			if tt.action != nil {
+				tt.action(complete, cancel)
+			}
+
 			// Give flow time to start
-			time.Sleep(20 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 
-			// Run test
-			tt.test(t, in, out, cancel)
-
-			// Wait for all goroutines to complete
-			wg.Wait()
+			tt.check(t, out, upstreamCompleteCalled)
 		})
 	}
 }

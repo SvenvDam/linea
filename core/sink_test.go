@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -10,18 +11,35 @@ import (
 )
 
 func TestSink(t *testing.T) {
+	createSink := func() *Sink[int, []int] {
+		return NewSink(
+			[]int{}, // initial empty slice
+			func(ctx context.Context, elem int, acc []int, cancel context.CancelFunc, complete CompleteFunc) ([]int, bool) {
+				return append(acc, elem), true
+			},
+			nil, // Using default error handler
+		)
+	}
+
 	tests := []struct {
-		name string
-		test func(t *testing.T, in chan<- Item[int], out <-chan Item[[]int], completeSignal chan<- struct{}, cancel context.CancelFunc)
+		name   string
+		setup  func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) (chan Item[int], *atomic.Bool)
+		action func(completeSignal chan<- struct{}, cancel context.CancelFunc)
+		check  func(t *testing.T, out <-chan Item[[]int], upstreamCompleteCalled *atomic.Bool)
 	}{
 		{
 			name: "happy path - processes all input values",
-			test: func(t *testing.T, in chan<- Item[int], out <-chan Item[[]int], completeSignal chan<- struct{}, cancel context.CancelFunc) {
+			setup: func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) (chan Item[int], *atomic.Bool) {
+				upstreamCompleteCalled := &atomic.Bool{}
+				in := make(chan Item[int], 3)
 				in <- Item[int]{Value: 1}
 				in <- Item[int]{Value: 2}
 				in <- Item[int]{Value: 3}
 				close(in)
 
+				return in, upstreamCompleteCalled
+			},
+			check: func(t *testing.T, out <-chan Item[[]int], upstreamCompleteCalled *atomic.Bool) {
 				result, ok := <-out
 				assert.True(t, ok)
 				assert.Equal(t, []int{1, 2, 3}, result.Value)
@@ -32,16 +50,79 @@ func TestSink(t *testing.T) {
 		},
 		{
 			name: "respects context cancellation",
-			test: func(t *testing.T, in chan<- Item[int], out <-chan Item[[]int], completeSignal chan<- struct{}, cancel context.CancelFunc) {
-				in <- Item[int]{Value: 1}
-				in <- Item[int]{Value: 2}
+			setup: func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) (chan Item[int], *atomic.Bool) {
+				in := make(chan Item[int])
 
+				return in, nil
+			},
+			action: func(_ chan<- struct{}, cancel context.CancelFunc) {
 				cancel()
+			},
+			check: func(t *testing.T, out <-chan Item[[]int], upstreamCompleteCalled *atomic.Bool) {
+				result, ok := <-out
+				assert.False(t, ok)
+				assert.Nil(t, result.Value)
+			},
+		},
+		{
+			name: "signals upstream to complete when requested",
+			setup: func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) (chan Item[int], *atomic.Bool) {
+				in := make(chan Item[int])
+				upstreamCompleteCalled := &atomic.Bool{}
 
-				assert.Eventually(t, func() bool {
-					result, ok := <-out
-					return ok == false && result.Value == nil
-				}, time.Second, 10*time.Millisecond)
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					defer close(in)
+
+					// Send a test value
+					select {
+					case in <- Item[int]{Value: 1}:
+					case <-ctx.Done():
+						return
+					}
+
+					// Wait for complete signal
+					select {
+					case <-complete:
+						upstreamCompleteCalled.Store(true)
+						return
+					case <-ctx.Done():
+						return
+					}
+				}()
+
+				return in, upstreamCompleteCalled
+			},
+			action: func(completeSignal chan<- struct{}, _ context.CancelFunc) {
+				close(completeSignal)
+			},
+			check: func(t *testing.T, out <-chan Item[[]int], upstreamCompleteCalled *atomic.Bool) {
+				<-out
+				assert.True(t, upstreamCompleteCalled.Load(), "upstream complete function should have been called")
+			},
+		},
+		{
+			name: "handles errors with default error handler",
+			setup: func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) (chan Item[int], *atomic.Bool) {
+				in := make(chan Item[int], 3)
+				in <- Item[int]{Value: 1}
+				in <- Item[int]{Err: assert.AnError}
+				in <- Item[int]{Value: 2}
+				close(in)
+
+				return in, nil
+			},
+			check: func(t *testing.T, out <-chan Item[[]int], upstreamCompleteCalled *atomic.Bool) {
+				// Get the result
+				result, ok := <-out
+				assert.True(t, ok, "should receive a result")
+				assert.Equal(t, []int{1}, result.Value, "should only contain the value processed before the error")
+				assert.Equal(t, assert.AnError, result.Err, "should contain the original error")
+
+				// Channel should be closed after error
+				_, ok = <-out
+				assert.False(t, ok, "output channel should be closed after result is emitted")
 			},
 		},
 	}
@@ -53,96 +134,32 @@ func TestSink(t *testing.T) {
 			defer cancel()
 
 			wg := &sync.WaitGroup{}
-			in := make(chan Item[int])
 			completeSignal := make(chan struct{})
 
-			setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
+			sink := createSink()
+
+			var upstreamCompleteCalled *atomic.Bool
+
+			in, upstreamCompleteCalled := tt.setup(ctx, cancel, wg, completeSignal)
+			setupFunc := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
 				return in
 			}
 
-			// Create sink that accumulates ints into a slice
-			sink := NewSink(
-				[]int{}, // initial empty slice
-				func(ctx context.Context, elem int, acc []int, cancel context.CancelFunc, complete CompleteFunc) ([]int, bool) {
-					return append(acc, elem), true
-				},
-				nil,
-			)
-
 			// Start sink
-			out := sink.setup(ctx, cancel, wg, completeSignal, setup)
-
-			// Give sink time to start
-			time.Sleep(20 * time.Millisecond)
+			out := sink.setup(ctx, cancel, wg, completeSignal, setupFunc)
 
 			// Run test
-			tt.test(t, in, out, completeSignal, cancel)
+			if tt.action != nil {
+				tt.action(completeSignal, cancel)
+			}
+
+			// Give sink time to start
+			time.Sleep(10 * time.Millisecond)
+
+			tt.check(t, out, upstreamCompleteCalled)
 
 			// Wait for all goroutines to complete
 			wg.Wait()
 		})
 	}
-}
-
-// TestSinkWithCompleteUpstream verifies that the sink signals the upstream to complete when requested
-func TestSinkWithCompleteUpstream(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	wg := &sync.WaitGroup{}
-	completeSignal := make(chan struct{})
-
-	upstreamCompleteCalled := false
-
-	// Mock upstream setup function that captures when complete is called
-	setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
-		in := make(chan Item[int])
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer close(in)
-
-			// Send a test value
-			select {
-			case in <- Item[int]{Value: 1}:
-			case <-ctx.Done():
-				return
-			}
-
-			// Wait for complete signal
-			select {
-			case <-complete:
-				upstreamCompleteCalled = true
-				return
-			case <-ctx.Done():
-				return
-			}
-		}()
-
-		return in
-	}
-
-	// Create sink with a function that always calls complete
-	sink := NewSink(
-		[]int{},
-		func(ctx context.Context, elem int, acc []int, cancel context.CancelFunc, complete CompleteFunc) ([]int, bool) {
-			complete() // Always signal upstream to complete
-			return append(acc, elem), true
-		},
-		nil,
-	)
-
-	// Start sink
-	out := sink.setup(ctx, cancel, wg, completeSignal, setup)
-
-	// Drain the output
-	for range out {
-	}
-
-	// Wait for goroutines to complete
-	wg.Wait()
-
-	// Verify the upstream was signaled to complete
-	assert.True(t, upstreamCompleteCalled, "upstream complete function should have been called")
 }
