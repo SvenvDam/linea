@@ -3,6 +3,8 @@ package core
 import (
 	"context"
 	"sync"
+
+	"github.com/svenvdam/linea/util"
 )
 
 // Flow represents a transformation stage in a data processing pipeline.
@@ -14,14 +16,25 @@ import (
 //   - O: The type of output items the Flow produces
 //
 // Fields:
-//   - setup: A function that initializes the Flow's goroutine and connects it to the input channel
+//   - setup: A function that initializes the Flow's goroutine and connects it to the input channel.
+//
+// It receives:
+//   - ctx: Context used to control cancellation
+//   - cancel: Function to cancel execution
+//   - wg: WaitGroup to coordinate goroutine completion
+//   - complete: Channel used to signal graceful shutdown, when closed the flow
+//     will stop accepting new items but continue processing remaining ones
+//   - setupUpstream: The setup function of the upstream component, allowing composition
+//     of pipeline components through function composition
+//     The setup function returns a channel that provides the flow's output items
 type Flow[I, O any] struct {
 	setup func(
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
-		in <-chan I,
-	) <-chan O
+		complete <-chan struct{},
+		setupUpstream setupFunc[I],
+	) <-chan Item[O]
 }
 
 // FlowOption is a function type for configuring Flow behavior.
@@ -51,6 +64,39 @@ func WithFlowBufSize(size int) FlowOption {
 	}
 }
 
+// DefaultFlowErrorHandler is the default implementation for handling errors in a Flow.
+// It sends the error downstream and stops the flow by returning false.
+//
+// Parameters:
+//   - ctx: Context used for cancellation
+//   - err: The error that occurred
+//   - out: Channel to send output items
+//   - cancel: Function to cancel execution
+//   - complete: Function to signal graceful shutdown
+//
+// Returns:
+//   - false to stop the flow
+func DefaultFlowErrorHandler[O any](
+	ctx context.Context,
+	err error,
+	out chan<- Item[O],
+	cancel context.CancelFunc,
+	complete CompleteFunc,
+) bool {
+	util.Send(ctx, Item[O]{Err: err}, out)
+	return false
+}
+
+// DefaultFlowDoneHandler is the default implementation for cleanup when a Flow completes.
+// It performs no operations and is used when no custom cleanup is needed.
+//
+// Parameters:
+//   - ctx: Context used for cancellation
+//   - out: Channel to send any final output items
+func DefaultFlowDoneHandler[O any](ctx context.Context, out chan<- Item[O]) {
+	// No operation by default
+}
+
 // NewFlow creates a new Flow that transforms input items to output items using
 // the provided process function.
 //
@@ -69,7 +115,15 @@ func WithFlowBufSize(size int) FlowOption {
 //   - Sending the transformed item to the output channel
 //   - Returning true to continue processing, false to stop the flow
 //
-// # It receives the current context, input element, output channel, and cancel function
+// # It receives the current context, input element, output channel, cancel function, and complete function
+//
+// onErr is responsible for:
+//   - Handling upstream errors that occur during processing
+//   - Sending error information to the output channel if needed
+//   - Returning true to continue processing, false to stop the flow
+//
+// # It receives the current context, the error, output channel, cancel function, and complete function
+// # If nil is provided, a default handler will be used that sends the error and stops the flow
 //
 // onDone is responsible for:
 //   - Performing final operations and cleanup
@@ -77,6 +131,7 @@ func WithFlowBufSize(size int) FlowOption {
 //   - Handling cleanup of any resources created during processing
 //
 // # It receives the current context and output channel
+// # If nil is provided, an empty default implementation will be used
 //
 // Type Parameters:
 //   - I: The type of input items
@@ -85,11 +140,20 @@ func WithFlowBufSize(size int) FlowOption {
 // Returns:
 //   - A new Flow instance that will perform the specified transformation
 func NewFlow[I, O any](
-	onElem func(ctx context.Context, elem I, out chan<- O, cancel context.CancelFunc) bool,
-	onDone func(ctx context.Context, out chan<- O),
+	onElem func(ctx context.Context, elem I, out chan<- Item[O], cancel context.CancelFunc, complete CompleteFunc) bool,
+	onErr func(ctx context.Context, err error, out chan<- Item[O], cancel context.CancelFunc, complete CompleteFunc) bool,
+	onDone func(ctx context.Context, out chan<- Item[O]),
 	opts ...FlowOption,
 ) *Flow[I, O] {
 	cfg := &flowConfig{}
+
+	if onErr == nil {
+		onErr = DefaultFlowErrorHandler[O]
+	}
+
+	if onDone == nil {
+		onDone = DefaultFlowDoneHandler[O]
+	}
 
 	// Apply all options
 	for _, opt := range opts {
@@ -100,27 +164,38 @@ func NewFlow[I, O any](
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
-		in <-chan I,
-	) <-chan O {
-		out := make(chan O, cfg.bufSize)
+		complete <-chan struct{},
+		setupUpstream setupFunc[I],
+	) <-chan Item[O] {
+		out := make(chan Item[O], cfg.bufSize)
+		completeUpstreamChan, completeUpstream := util.NewCompleteChannel()
+		in := setupUpstream(ctx, cancel, wg, completeUpstreamChan)
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			defer close(out)
+			defer onDone(ctx, out)
+			defer completeUpstream()
+
 			for {
 				select {
 				case <-ctx.Done():
-					onDone(ctx, out)
 					return
+				case <-complete:
+					completeUpstream()
 				case elem, ok := <-in:
 					if !ok {
-						onDone(ctx, out)
 						return
 					}
-					ok = onElem(ctx, elem, out, cancel)
-					if !ok {
-						onDone(ctx, out)
+
+					var proceed bool
+					if elem.Err != nil {
+						proceed = onErr(ctx, elem.Err, out, cancel, completeUpstream)
+					} else {
+						proceed = onElem(ctx, elem.Value, out, cancel, completeUpstream)
+					}
+					if !proceed {
 						return
 					}
 				}

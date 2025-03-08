@@ -13,47 +13,47 @@ import (
 
 func TestCancelIf(t *testing.T) {
 	tests := []struct {
-		name  string
-		input []int
-		pred  func(int) bool
-		check func(t *testing.T, item int)
-		ok    bool
+		name        string
+		input       []int
+		pred        func(int) bool
+		check       func(t *testing.T, seen []int)
+		expectedErr error
 	}{
 		{
 			name:  "cancels on first matching item",
 			input: []int{1, 2, 3, 4, 5},
 			pred:  func(i int) bool { return i == 3 },
-			check: func(t *testing.T, item int) {
-				assert.Less(t, item, 3, "should not receive items after cancellation")
+			check: func(t *testing.T, seen []int) {
+				assert.Equal(t, []int{1, 2}, seen)
 			},
-			ok: false,
+			expectedErr: context.Canceled,
 		},
 		{
 			name:  "passes all items when predicate never matches",
 			input: []int{1, 2, 3},
 			pred:  func(i int) bool { return false },
-			check: func(t *testing.T, item int) {
-				assert.Contains(t, []int{1, 2, 3}, item)
+			check: func(t *testing.T, seen []int) {
+				assert.Equal(t, []int{1, 2, 3}, seen)
 			},
-			ok: true,
+			expectedErr: nil,
 		},
 		{
 			name:  "cancels on first item",
 			input: []int{1, 2, 3},
 			pred:  func(i int) bool { return true },
-			check: func(t *testing.T, item int) {
-				t.Error("should not receive any items")
+			check: func(t *testing.T, seen []int) {
+				assert.Equal(t, []int{}, seen)
 			},
-			ok: false,
+			expectedErr: context.Canceled,
 		},
 		{
 			name:  "handles empty input",
 			input: []int{},
 			pred:  func(i int) bool { return true },
-			check: func(t *testing.T, item int) {
-				t.Error("should not receive any items")
+			check: func(t *testing.T, seen []int) {
+				assert.Equal(t, []int{}, seen)
 			},
-			ok: true,
+			expectedErr: nil,
 		},
 	}
 
@@ -64,12 +64,16 @@ func TestCancelIf(t *testing.T) {
 			stream := compose.SourceThroughFlowToSink2(
 				sources.Slice(tt.input),
 				CancelIf(tt.pred),
-				test.AssertEachItem(t, tt.check),
+				test.CheckItems(t, tt.check),
 				sinks.Noop[int](),
 			)
 
 			res := <-stream.Run(ctx)
-			assert.Equal(t, tt.ok, res.Ok)
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, res.Err, tt.expectedErr)
+			} else {
+				assert.NoError(t, res.Err)
+			}
 		})
 	}
 }

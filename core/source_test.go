@@ -13,15 +13,15 @@ func TestSource(t *testing.T) {
 	tests := []struct {
 		name    string
 		bufSize int
-		test    func(in chan<- int, out <-chan int, drain chan struct{}, cancel context.CancelFunc)
+		test    func(in chan<- Item[int], out <-chan Item[int], drain chan struct{}, cancel context.CancelFunc)
 	}{
 		{
 			name:    "happy path - emits all generated values",
 			bufSize: 0,
-			test: func(in chan<- int, out <-chan int, drain chan struct{}, cancel context.CancelFunc) {
-				in <- 1
+			test: func(in chan<- Item[int], out <-chan Item[int], drain chan struct{}, cancel context.CancelFunc) {
+				in <- Item[int]{Value: 1}
 				res, ok := <-out
-				assert.Equal(t, 1, res)
+				assert.Equal(t, 1, res.Value)
 				assert.True(t, ok)
 
 				close(in)
@@ -32,7 +32,7 @@ func TestSource(t *testing.T) {
 		{
 			name:    "respects drain signal",
 			bufSize: 0,
-			test: func(in chan<- int, out <-chan int, drain chan struct{}, cancel context.CancelFunc) {
+			test: func(in chan<- Item[int], out <-chan Item[int], drain chan struct{}, cancel context.CancelFunc) {
 				close(drain)
 				_, ok := <-out
 				assert.False(t, ok)
@@ -41,7 +41,7 @@ func TestSource(t *testing.T) {
 		{
 			name:    "respects context cancellation",
 			bufSize: 0,
-			test: func(in chan<- int, out <-chan int, drain chan struct{}, cancel context.CancelFunc) {
+			test: func(in chan<- Item[int], out <-chan Item[int], drain chan struct{}, cancel context.CancelFunc) {
 				cancel()
 				_, ok := <-out
 				assert.False(t, ok)
@@ -50,14 +50,14 @@ func TestSource(t *testing.T) {
 		{
 			name:    "handles buffered channel",
 			bufSize: 2,
-			test: func(in chan<- int, out <-chan int, drain chan struct{}, cancel context.CancelFunc) {
-				in <- 1
-				in <- 2
-				in <- 3
+			test: func(in chan<- Item[int], out <-chan Item[int], drain chan struct{}, cancel context.CancelFunc) {
+				in <- Item[int]{Value: 1}
+				in <- Item[int]{Value: 2}
+				in <- Item[int]{Value: 3}
 				close(in)
-				res := make([]int, 0, 2)
+				res := make([]int, 0)
 				for v := range out {
-					res = append(res, v)
+					res = append(res, v.Value)
 				}
 				assert.Equal(t, []int{1, 2, 3}, res)
 			},
@@ -70,13 +70,13 @@ func TestSource(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			in := make(chan int)
+			in := make(chan Item[int])
 
 			wg := &sync.WaitGroup{}
 			drain := make(chan struct{})
 
 			// Create source with test generator
-			source := NewSource(func(ctx context.Context, drain <-chan struct{}, cancel context.CancelFunc) <-chan int {
+			source := NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan Item[int] {
 				return in
 			}, WithSourceBufSize(tt.bufSize))
 

@@ -66,7 +66,7 @@ func TestSqsStream(t *testing.T) {
 	// Drain the processor
 	sqsStream.Drain()
 	result := <-resultChan
-	assert.True(t, result.Ok, "Expected processor to complete successfully")
+	assert.NoError(t, result.Err)
 
 	// Read messages from destination queue to verify they were transformed and sent
 	receivedMessages, err := receiveAllMessages(ctx, sqsClient, destQueueURL)

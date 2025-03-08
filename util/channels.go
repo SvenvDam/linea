@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+	"sync"
 )
 
 // Send attempts to send an element to a channel with context cancellation support.
@@ -42,4 +43,22 @@ func SendMany[T any](ctx context.Context, elems []T, out chan<- T) {
 		case out <- elem:
 		}
 	}
+}
+
+// NewCompleteChannel creates a new complete channel and a cancel function.
+// The cancel function can be used to close the channel. Calling it multiple times
+// will not panic.
+//
+// Returns:
+//   - complete: The complete channel
+//   - cancel: The cancel function
+func NewCompleteChannel() (chan struct{}, func()) {
+	complete := make(chan struct{})
+	once := sync.Once{}
+	completeFn := func() {
+		once.Do(func() {
+			close(complete)
+		})
+	}
+	return complete, completeFn
 }

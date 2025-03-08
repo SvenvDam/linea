@@ -56,7 +56,7 @@ func TestBackpressure(t *testing.T) {
 			stream.Drain()
 
 			res := <-resChan
-			assert.True(t, res.Ok)
+			assert.NoError(t, res.Err)
 
 			for i := 1; i < len(seenTimes); i++ {
 				if i < streamCapacity {

@@ -74,7 +74,7 @@ func TestFlatMap(t *testing.T) {
 			)
 
 			res := <-stream.Run(ctx)
-			assert.True(t, res.Ok)
+			assert.NoError(t, res.Err)
 		})
 	}
 }

@@ -42,7 +42,7 @@ func TestSlice(t *testing.T) {
 
 			res := <-stream.Run(ctx)
 			assert.Equal(t, tt.want, res.Value)
-			assert.True(t, res.Ok)
+			assert.NoError(t, res.Err)
 		})
 	}
 }

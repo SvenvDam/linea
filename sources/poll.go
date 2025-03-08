@@ -2,7 +2,7 @@ package sources
 
 import (
 	"context"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/svenvdam/linea/core"
@@ -15,8 +15,9 @@ import (
 //
 // The poll function returns three values:
 //   - val: Pointer to the value to emit (or nil if no value should be emitted)
-//   - more: Whether there are more items available to poll immediately
-//   - err: Error that occurred during polling (if non-nil, the stream will be cancelled)
+//   - more: Whether there are more items available to poll immediately. If true, the next polling attempt
+//     will occur immediately (nanosecond interval) rather than waiting for the specified interval.
+//   - err: Error that occurred during polling (if non-nil, the error will be sent to the stream and polling continues)
 //
 // Type Parameters:
 //   - O: The type of items produced by this source
@@ -24,41 +25,39 @@ import (
 // Parameters:
 //   - poll: Function that takes a context and returns a pointer to a value (or nil), a flag indicating whether
 //     there are more items to poll immediately, and an error
-//   - interval: Duration between polling attempts
+//   - interval: Duration between polling attempts when 'more' is false
 //   - opts: Optional configuration options for the source
 //
-// Returns a Source that produces items from the polling function
+// Returns a Source that produces items from the polling function. If the poll function returns a nil value,
+// no item will be emitted for that polling cycle.
 func Poll[O any](
 	poll func(context.Context) (val *O, more bool, err error),
 	interval time.Duration,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context, drain <-chan struct{}, cancel context.CancelFunc) <-chan O {
-		out := make(chan O)
+	return core.NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan core.Item[O] {
+		out := make(chan core.Item[O])
+		wg.Add(1)
 		go func() {
 			defer close(out)
+			defer wg.Done()
 
-			// Create a ticker to control polling frequency
 			ticker := time.NewTicker(interval)
 			defer ticker.Stop()
 
-			// Set to true to poll immediately on start, using atomic operations for thread safety
-			shouldPoll := atomic.Bool{}
+			shouldPoll := true
 
 			for {
-				if shouldPoll.Load() {
-					// Get value from polling function
+				if shouldPoll {
 					val, more, err := poll(ctx)
 
-					// If there's an error, cancel the stream and return
 					if err != nil {
-						cancel()
-						return
+						util.Send(ctx, core.Item[O]{Err: err}, out)
 					}
 
 					// Send the value if it's not nil
 					if val != nil {
-						util.Send(ctx, *val, out)
+						util.Send(ctx, core.Item[O]{Value: *val}, out)
 					}
 
 					// Reset the ticker based on whether there are more items to poll immediately
@@ -69,17 +68,17 @@ func Poll[O any](
 					}
 
 					// Wait for next tick before polling again
-					shouldPoll.Store(false)
+					shouldPoll = false
 				}
 
 				// Wait for next tick or context cancellation
 				select {
 				case <-ctx.Done():
 					return
-				case <-drain:
+				case <-complete:
 					return
 				case <-ticker.C:
-					shouldPoll.Store(true)
+					shouldPoll = true
 				}
 			}
 		}()

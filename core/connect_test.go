@@ -7,42 +7,48 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/svenvdam/linea/util"
 )
 
 func TestConnectFlows(t *testing.T) {
 	// Create two simple flows: int -> string -> int
-	flow1 := NewFlow(func(ctx context.Context, elem int, out chan<- string, cancel context.CancelFunc) bool {
-		out <- strconv.Itoa(elem)
+	flow1 := NewFlow(func(ctx context.Context, elem int, out chan<- Item[string], cancel context.CancelFunc, complete CompleteFunc) bool {
+		out <- Item[string]{Value: strconv.Itoa(elem)}
 		return true
-	}, func(ctx context.Context, out chan<- string) {})
+	}, nil, nil)
 
-	flow2 := NewFlow(func(ctx context.Context, elem string, out chan<- int, cancel context.CancelFunc) bool {
+	flow2 := NewFlow(func(ctx context.Context, elem string, out chan<- Item[int], cancel context.CancelFunc, complete CompleteFunc) bool {
 		val, _ := strconv.Atoi(elem)
-		out <- val * 2
+		out <- Item[int]{Value: val * 2}
 		return true
-	}, func(ctx context.Context, out chan<- int) {})
+	}, nil, nil)
 
 	// Connect the flows
 	combined := ConnectFlows(flow1, flow2)
 
 	// Create channels for testing
-	in := make(chan int)
+	in := make(chan Item[int])
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	completeChan, _ := util.NewCompleteChannel()
+	setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
+		return in
+	}
 
 	// Set up the combined flow
-	out := combined.setup(ctx, cancel, &wg, in)
+	out := combined.setup(ctx, cancel, &wg, completeChan, setup)
 
 	// Test the transformation
 	go func() {
-		in <- 42
+		in <- Item[int]{Value: 42}
 		close(in)
 	}()
 
 	// Verify the result
 	result := <-out
-	assert.Equal(t, 84, result) // 42 -> "42" -> 84
+	assert.Equal(t, 84, result.Value) // 42 -> "42" -> 84
+	assert.NoError(t, result.Err)
 
 	// Verify channel closes
 	_, ok := <-out
@@ -51,20 +57,20 @@ func TestConnectFlows(t *testing.T) {
 
 func TestAppendFlowToSource(t *testing.T) {
 	// Create a simple source that emits one number
-	source := NewSource(func(ctx context.Context, drain <-chan struct{}, cancel context.CancelFunc) <-chan int {
-		out := make(chan int)
+	source := NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan Item[int] {
+		out := make(chan Item[int])
 		go func() {
 			defer close(out)
-			out <- 42
+			out <- Item[int]{Value: 42}
 		}()
 		return out
 	})
 
 	// Create a flow that doubles the number
-	flow := NewFlow(func(ctx context.Context, elem int, out chan<- int, cancel context.CancelFunc) bool {
-		out <- elem * 2
+	flow := NewFlow(func(ctx context.Context, elem int, out chan<- Item[int], cancel context.CancelFunc, complete CompleteFunc) bool {
+		out <- Item[int]{Value: elem * 2}
 		return true
-	}, func(ctx context.Context, out chan<- int) {})
+	}, nil, nil)
 
 	// Combine source and flow
 	combined := AppendFlowToSource(source, flow)
@@ -78,7 +84,8 @@ func TestAppendFlowToSource(t *testing.T) {
 
 	// Verify the transformation
 	result := <-out
-	assert.Equal(t, 84, result) // 42 -> 84
+	assert.Equal(t, 84, result.Value) // 42 -> 84
+	assert.NoError(t, result.Err)
 
 	// Verify channel closes
 	_, ok := <-out
@@ -87,16 +94,17 @@ func TestAppendFlowToSource(t *testing.T) {
 
 func TestPrependFlowToSink(t *testing.T) {
 	// Create a flow that converts int to string
-	flow := NewFlow(func(ctx context.Context, elem int, out chan<- string, cancel context.CancelFunc) bool {
-		out <- strconv.Itoa(elem)
+	flow := NewFlow(func(ctx context.Context, elem int, out chan<- Item[string], cancel context.CancelFunc, complete CompleteFunc) bool {
+		out <- Item[string]{Value: strconv.Itoa(elem)}
 		return true
-	}, func(ctx context.Context, out chan<- string) {})
+	}, nil, nil)
 
 	// Create a sink that concatenates strings
 	sink := NewSink("",
-		func(ctx context.Context, elem string, acc string, cancel context.CancelFunc) string {
-			return acc + elem
+		func(ctx context.Context, elem string, acc string, cancel context.CancelFunc, complete CompleteFunc) (string, bool) {
+			return acc + elem, true
 		},
+		nil,
 	)
 
 	// Combine flow and sink
@@ -106,18 +114,23 @@ func TestPrependFlowToSink(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var wg sync.WaitGroup
-	in := make(chan int)
-	out := combined.setup(ctx, cancel, &wg, in)
+	in := make(chan Item[int])
+	completeChan, _ := util.NewCompleteChannel()
+	setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
+		return in
+	}
+	out := combined.setup(ctx, cancel, &wg, completeChan, setup)
 
 	// Test the transformation
 	go func() {
-		in <- 42
+		in <- Item[int]{Value: 42}
 		close(in)
 	}()
 
 	// Verify the result
 	result := <-out
-	assert.Equal(t, "42", result) // 42 -> "42"
+	assert.Equal(t, "42", result.Value) // 42 -> "42"
+	assert.NoError(t, result.Err)
 
 	// Verify channel closes
 	_, ok := <-out
@@ -126,20 +139,21 @@ func TestPrependFlowToSink(t *testing.T) {
 
 func TestConnectSourceToSink(t *testing.T) {
 	// Create a source that emits one number
-	source := NewSource(func(ctx context.Context, drain <-chan struct{}, cancel context.CancelFunc) <-chan int {
-		out := make(chan int)
+	source := NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan Item[int] {
+		out := make(chan Item[int])
 		go func() {
 			defer close(out)
-			out <- 42
+			out <- Item[int]{Value: 42}
 		}()
 		return out
 	})
 
 	// Create a sink that converts to string
 	sink := NewSink("",
-		func(ctx context.Context, elem int, acc string, cancel context.CancelFunc) string {
-			return acc + strconv.Itoa(elem)
+		func(ctx context.Context, elem int, acc string, cancel context.CancelFunc, complete CompleteFunc) (string, bool) {
+			return acc + strconv.Itoa(elem), true
 		},
+		nil,
 	)
 
 	// Create the stream
@@ -150,6 +164,6 @@ func TestConnectSourceToSink(t *testing.T) {
 	result := <-stream.Run(ctx)
 
 	// Verify the result
-	assert.True(t, result.Ok)
+	assert.NoError(t, result.Err)
 	assert.Equal(t, "42", result.Value)
 }

@@ -29,7 +29,7 @@ func TestDeleteFlow(t *testing.T) {
 		input           TestMessage
 		setupMocks      func(t *testing.T, mock *mocks.MockSQSDeleteClient)
 		expectedResults []DeleteMessageResult[TestMessage]
-		expectError     bool
+		expectedErr     error
 	}{
 		{
 			name: "successfully deletes message",
@@ -61,7 +61,7 @@ func TestDeleteFlow(t *testing.T) {
 					Output: &sqs.DeleteMessageOutput{},
 				},
 			},
-			expectError: false,
+			expectedErr: nil,
 		},
 		{
 			name: "handles error from SQS",
@@ -84,7 +84,7 @@ func TestDeleteFlow(t *testing.T) {
 					Return(nil, errors.New("sqs error")).Once()
 			},
 			expectedResults: nil,
-			expectError:     true,
+			expectedErr:     errors.New("sqs error"),
 		},
 		{
 			name: "handles nil receipt handle",
@@ -100,7 +100,7 @@ func TestDeleteFlow(t *testing.T) {
 				// No mock expectations because DeleteMessage should not be called
 			},
 			expectedResults: nil,
-			expectError:     true,
+			expectedErr:     errors.New("receipt handle is nil"),
 		},
 	}
 
@@ -134,15 +134,8 @@ func TestDeleteFlow(t *testing.T) {
 			// Run the stream
 			result := <-stream.Run(ctx)
 
-			if tt.expectError {
-				assert.False(t, result.Ok, "Expected stream to fail")
-			} else {
-				assert.True(t, result.Ok, "Expected stream to complete successfully")
-				// Get the results from the stream result
-				resultSlice := result.Value
-				// Compare the results using ElementsMatch
-				assert.ElementsMatch(t, tt.expectedResults, resultSlice)
-			}
+			assert.ElementsMatch(t, tt.expectedResults, result.Value)
+			assert.Equal(t, tt.expectedErr, result.Err)
 		})
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/sinks"
-	"github.com/svenvdam/linea/test"
 )
 
 func TestRepeat(t *testing.T) {
@@ -32,16 +31,9 @@ func TestRepeat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			stream := compose.SourceThroughFlowToSink2(
+			stream := compose.SourceToSink(
 				Repeat(tt.element),
-				test.AssertEachItem(t, func(t *testing.T, in int) {
-					assert.Equal(t, tt.element, in)
-				}),
-				test.CheckItems(t, func(t *testing.T, seen []int) {
-					assert.Greater(t, len(seen), 1)
-					tt.check(t, seen)
-				}),
-				sinks.Noop[int](),
+				sinks.Slice[int](),
 			)
 
 			resChan := stream.Run(ctx)
@@ -49,7 +41,11 @@ func TestRepeat(t *testing.T) {
 			stream.Drain()
 			res := <-resChan
 
-			assert.True(t, res.Ok)
+			assert.Greater(t, len(res.Value), 1)
+			for _, val := range res.Value {
+				assert.Equal(t, tt.element, val, "every item should equal the repeated element")
+			}
+			assert.NoError(t, res.Err)
 		})
 	}
 }

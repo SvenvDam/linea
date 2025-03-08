@@ -166,7 +166,7 @@ func TestComposeVariants(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			stream := tt.setup()
 			res := <-stream.Run(context.Background())
-			assert.True(t, res.Ok)
+			assert.NoError(t, res.Err)
 			assert.Equal(t, tt.expected, res.Value)
 			stream.Cancel()
 		})

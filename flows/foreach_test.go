@@ -61,7 +61,7 @@ func TestForEach(t *testing.T) {
 			)
 
 			res := <-stream.Run(ctx)
-			assert.True(t, res.Ok)
+			assert.NoError(t, res.Err)
 			for _, item := range tt.input {
 				val, ok := seen.Load(item)
 				assert.True(t, ok)

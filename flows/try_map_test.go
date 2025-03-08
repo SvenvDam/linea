@@ -18,7 +18,7 @@ func TestTryMap(t *testing.T) {
 		input       []int
 		mapFn       func(int) (string, error)
 		expected    []string
-		expectError bool
+		expectedErr error
 	}{
 		{
 			name:  "transforms all items successfully",
@@ -27,7 +27,7 @@ func TestTryMap(t *testing.T) {
 				return strconv.Itoa(i), nil
 			},
 			expected:    []string{"1", "2", "3"},
-			expectError: false,
+			expectedErr: nil,
 		},
 		{
 			name:  "cancels on error",
@@ -38,8 +38,8 @@ func TestTryMap(t *testing.T) {
 				}
 				return strconv.Itoa(i), nil
 			},
-			expected:    nil,
-			expectError: true,
+			expected:    []string{"1", "2"},
+			expectedErr: errors.New("error on 3"),
 		},
 		{
 			name:  "handles empty input",
@@ -48,7 +48,7 @@ func TestTryMap(t *testing.T) {
 				return strconv.Itoa(i), nil
 			},
 			expected:    []string{},
-			expectError: false,
+			expectedErr: nil,
 		},
 		{
 			name:  "immediate error cancels",
@@ -59,8 +59,8 @@ func TestTryMap(t *testing.T) {
 				}
 				return strconv.Itoa(i), nil
 			},
-			expected:    nil,
-			expectError: true,
+			expected:    []string{},
+			expectedErr: errors.New("error on first item"),
 		},
 	}
 
@@ -80,7 +80,7 @@ func TestTryMap(t *testing.T) {
 
 			res := <-stream.Run(ctx)
 
-			assert.Equal(t, !tt.expectError, res.Ok, "Result.Ok should match expected error state")
+			assert.Equal(t, tt.expectedErr, res.Err)
 			assert.Equal(t, tt.expected, res.Value)
 		})
 	}
