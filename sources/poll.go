@@ -15,8 +15,9 @@ import (
 //
 // The poll function returns three values:
 //   - val: Pointer to the value to emit (or nil if no value should be emitted)
-//   - more: Whether there are more items available to poll immediately
-//   - err: Error that occurred during polling (if non-nil, the stream will be cancelled)
+//   - more: Whether there are more items available to poll immediately. If true, the next polling attempt
+//     will occur immediately (nanosecond interval) rather than waiting for the specified interval.
+//   - err: Error that occurred during polling (if non-nil, the error will be sent to the stream and polling continues)
 //
 // Type Parameters:
 //   - O: The type of items produced by this source
@@ -24,10 +25,11 @@ import (
 // Parameters:
 //   - poll: Function that takes a context and returns a pointer to a value (or nil), a flag indicating whether
 //     there are more items to poll immediately, and an error
-//   - interval: Duration between polling attempts
+//   - interval: Duration between polling attempts when 'more' is false
 //   - opts: Optional configuration options for the source
 //
-// Returns a Source that produces items from the polling function
+// Returns a Source that produces items from the polling function. If the poll function returns a nil value,
+// no item will be emitted for that polling cycle.
 func Poll[O any](
 	poll func(context.Context) (val *O, more bool, err error),
 	interval time.Duration,

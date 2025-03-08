@@ -84,12 +84,21 @@ func WithFlowBufSize(size int) FlowOption {
 //
 // # It receives the current context, input element, output channel, cancel function, and complete function
 //
+// onErr is responsible for:
+//   - Handling upstream errors that occur during processing
+//   - Sending error information to the output channel if needed
+//   - Returning true to continue processing, false to stop the flow
+//
+// # It receives the current context, the error, output channel, cancel function, and complete function
+// # If nil is provided, a default handler will be used that sends the error and stops the flow
+//
 // onDone is responsible for:
 //   - Performing final operations and cleanup
 //   - Sending remaining items to the output channel
 //   - Handling cleanup of any resources created during processing
 //
 // # It receives the current context and output channel
+// # If nil is provided, an empty default implementation will be used
 //
 // Type Parameters:
 //   - I: The type of input items

@@ -53,9 +53,8 @@ type Source[O any] struct {
 	) <-chan Item[O]
 }
 
-// NewSource creates a new Source that produces items using the provided generate function.
-// The source is lazy and won't start producing items until it is connected to a flow or sink
-// and explicitly started.
+// NewSource creates a new data source that can be connected to other components in a data processing pipeline.
+// It serves as the entry point for data flowing through the system.
 //
 // Parameters:
 //   - generate: A function that implements the source's item generation logic.
@@ -67,6 +66,7 @@ type Source[O any] struct {
 //   - ctx: A context for cancellation and coordination
 //   - complete: A channel that closes when the source should stop producing new items
 //   - cancel: A function to cancel execution if needed
+//   - wg: A WaitGroup for synchronization with other components
 //
 // Type Parameters:
 //   - O: The type of items that will be produced by this source

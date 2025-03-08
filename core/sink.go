@@ -34,9 +34,9 @@ type Sink[I, R any] struct {
 	) <-chan Item[R]
 }
 
-// NewSink creates a new Sink that processes items using the provided functions.
-// The sink accumulates results by applying onElem to each input item, starting with
-// the initial value.
+// NewSink creates a terminal component in a data processing pipeline that consumes incoming data
+// and produces a final result. It acts as an accumulator, processing each incoming item
+// and updating a result value.
 //
 // The Sink automatically handles:
 //   - Goroutine lifecycle management
@@ -44,8 +44,9 @@ type Sink[I, R any] struct {
 //   - Channel cleanup on completion
 //
 // Parameters:
-//   - initial: The initial value of the accumulator
-//   - onElem: A function called for each input element to update the accumulator.
+//   - initial: The initial value of the accumulator that will be used as the starting point
+//   - onElem: A function called for each input element to update the accumulator
+//   - onErr: A function called when an error is encountered in the input stream
 //
 // onElem receives:
 //   - ctx: A context for cancellation
@@ -54,7 +55,21 @@ type Sink[I, R any] struct {
 //   - cancel: Function to cancel the sink's context
 //   - complete: Function to signal upstream that processing is complete
 //
-// onElem returns the new accumulator value
+// onElem returns:
+//   - The new accumulator value
+//   - A boolean indicating whether to continue processing (true) or stop (false)
+//
+// onErr receives:
+//   - ctx: A context for cancellation
+//   - err: The error that was encountered
+//   - acc: The current accumulator value
+//   - cancel: Function to cancel the sink's context
+//   - complete: Function to signal upstream that processing is complete
+//
+// onErr returns:
+//   - The error to be included in the final result (can be modified)
+//   - A boolean indicating whether to continue processing (true) or stop (false)
+//   - If nil is provided, a default handler will be used that returns the error and stops processing
 //
 // Type Parameters:
 //   - I: The type of items consumed by this sink
