@@ -12,19 +12,19 @@ import (
 func TestSink(t *testing.T) {
 	tests := []struct {
 		name string
-		test func(t *testing.T, in chan<- int, out <-chan []int, completeSignal chan<- struct{}, cancel context.CancelFunc)
+		test func(t *testing.T, in chan<- Item[int], out <-chan Item[[]int], completeSignal chan<- struct{}, cancel context.CancelFunc)
 	}{
 		{
 			name: "happy path - processes all input values",
-			test: func(t *testing.T, in chan<- int, out <-chan []int, completeSignal chan<- struct{}, cancel context.CancelFunc) {
-				in <- 1
-				in <- 2
-				in <- 3
+			test: func(t *testing.T, in chan<- Item[int], out <-chan Item[[]int], completeSignal chan<- struct{}, cancel context.CancelFunc) {
+				in <- Item[int]{Value: 1}
+				in <- Item[int]{Value: 2}
+				in <- Item[int]{Value: 3}
 				close(in)
 
 				result, ok := <-out
 				assert.True(t, ok)
-				assert.Equal(t, []int{1, 2, 3}, result)
+				assert.Equal(t, []int{1, 2, 3}, result.Value)
 
 				_, ok = <-out
 				assert.False(t, ok, "output channel should be closed after result is emitted")
@@ -32,15 +32,15 @@ func TestSink(t *testing.T) {
 		},
 		{
 			name: "respects context cancellation",
-			test: func(t *testing.T, in chan<- int, out <-chan []int, completeSignal chan<- struct{}, cancel context.CancelFunc) {
-				in <- 1
-				in <- 2
+			test: func(t *testing.T, in chan<- Item[int], out <-chan Item[[]int], completeSignal chan<- struct{}, cancel context.CancelFunc) {
+				in <- Item[int]{Value: 1}
+				in <- Item[int]{Value: 2}
 
 				cancel()
 
 				assert.Eventually(t, func() bool {
 					result, ok := <-out
-					return ok == false && result == nil
+					return ok == false && result.Value == nil
 				}, time.Second, 10*time.Millisecond)
 			},
 		},
@@ -53,19 +53,20 @@ func TestSink(t *testing.T) {
 			defer cancel()
 
 			wg := &sync.WaitGroup{}
-			in := make(chan int)
+			in := make(chan Item[int])
 			completeSignal := make(chan struct{})
 
-			setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan int {
+			setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
 				return in
 			}
 
 			// Create sink that accumulates ints into a slice
 			sink := NewSink(
 				[]int{}, // initial empty slice
-				func(ctx context.Context, elem int, acc []int, cancel context.CancelFunc, complete CompleteFunc) []int {
-					return append(acc, elem)
+				func(ctx context.Context, elem int, acc []int, cancel context.CancelFunc, complete CompleteFunc) ([]int, bool) {
+					return append(acc, elem), true
 				},
+				nil,
 			)
 
 			// Start sink
@@ -94,8 +95,8 @@ func TestSinkWithCompleteUpstream(t *testing.T) {
 	upstreamCompleteCalled := false
 
 	// Mock upstream setup function that captures when complete is called
-	setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan int {
-		in := make(chan int)
+	setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
+		in := make(chan Item[int])
 
 		wg.Add(1)
 		go func() {
@@ -104,7 +105,7 @@ func TestSinkWithCompleteUpstream(t *testing.T) {
 
 			// Send a test value
 			select {
-			case in <- 1:
+			case in <- Item[int]{Value: 1}:
 			case <-ctx.Done():
 				return
 			}
@@ -125,10 +126,11 @@ func TestSinkWithCompleteUpstream(t *testing.T) {
 	// Create sink with a function that always calls complete
 	sink := NewSink(
 		[]int{},
-		func(ctx context.Context, elem int, acc []int, cancel context.CancelFunc, complete CompleteFunc) []int {
+		func(ctx context.Context, elem int, acc []int, cancel context.CancelFunc, complete CompleteFunc) ([]int, bool) {
 			complete() // Always signal upstream to complete
-			return append(acc, elem)
+			return append(acc, elem), true
 		},
+		nil,
 	)
 
 	// Start sink

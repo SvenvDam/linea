@@ -31,7 +31,7 @@ type Sink[I, R any] struct {
 		wg *sync.WaitGroup,
 		complete <-chan struct{},
 		setupUpstream setupFunc[I],
-	) <-chan R
+	) <-chan Item[R]
 }
 
 // NewSink creates a new Sink that processes items using the provided functions.
@@ -64,16 +64,23 @@ type Sink[I, R any] struct {
 //   - A configured Sink ready to be connected to a stream
 func NewSink[I, R any](
 	initial R,
-	onElem func(ctx context.Context, in I, acc R, cancel context.CancelFunc, complete CompleteFunc) R,
+	onElem func(ctx context.Context, in I, acc R, cancel context.CancelFunc, complete CompleteFunc) (R, bool),
+	onErr func(ctx context.Context, err error, acc R, cancel context.CancelFunc, complete CompleteFunc) (error, bool),
 ) *Sink[I, R] {
+	if onErr == nil {
+		onErr = func(ctx context.Context, err error, acc R, cancel context.CancelFunc, complete CompleteFunc) (error, bool) {
+			return err, false
+		}
+	}
+
 	setup := func(
 		ctx context.Context,
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		complete <-chan struct{},
 		setupUpstream setupFunc[I],
-	) <-chan R {
-		out := make(chan R)
+	) <-chan Item[R] {
+		out := make(chan Item[R])
 
 		completeUpstreamChan, completeUpstream := util.NewCompleteChannel()
 
@@ -83,7 +90,8 @@ func NewSink[I, R any](
 		go func() {
 			defer wg.Done()
 			defer close(out)
-			acc := initial
+			defer completeUpstream()
+			acc := Item[R]{Value: initial}
 			for {
 				select {
 				case <-ctx.Done():
@@ -96,7 +104,17 @@ func NewSink[I, R any](
 						util.Send(ctx, acc, out)
 						return
 					}
-					acc = onElem(ctx, elem, acc, cancel, completeUpstream)
+
+					var proceed bool
+					if elem.Err != nil {
+						acc.Err, proceed = onErr(ctx, elem.Err, acc.Value, cancel, completeUpstream)
+					} else {
+						acc.Value, proceed = onElem(ctx, elem.Value, acc.Value, cancel, completeUpstream)
+					}
+					if !proceed {
+						util.Send(ctx, acc, out)
+						return
+					}
 				}
 			}
 		}()

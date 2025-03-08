@@ -2,7 +2,7 @@ package sources
 
 import (
 	"context"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/svenvdam/linea/core"
@@ -33,32 +33,29 @@ func Poll[O any](
 	interval time.Duration,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc) <-chan O {
-		out := make(chan O)
+	return core.NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan core.Item[O] {
+		out := make(chan core.Item[O])
+		wg.Add(1)
 		go func() {
 			defer close(out)
+			defer wg.Done()
 
-			// Create a ticker to control polling frequency
 			ticker := time.NewTicker(interval)
 			defer ticker.Stop()
 
-			// Set to true to poll immediately on start, using atomic operations for thread safety
-			shouldPoll := atomic.Bool{}
+			shouldPoll := true
 
 			for {
-				if shouldPoll.Load() {
-					// Get value from polling function
+				if shouldPoll {
 					val, more, err := poll(ctx)
 
-					// If there's an error, cancel the stream and return
 					if err != nil {
-						cancel()
-						return
+						util.Send(ctx, core.Item[O]{Err: err}, out)
 					}
 
 					// Send the value if it's not nil
 					if val != nil {
-						util.Send(ctx, *val, out)
+						util.Send(ctx, core.Item[O]{Value: *val}, out)
 					}
 
 					// Reset the ticker based on whether there are more items to poll immediately
@@ -69,7 +66,7 @@ func Poll[O any](
 					}
 
 					// Wait for next tick before polling again
-					shouldPoll.Store(false)
+					shouldPoll = false
 				}
 
 				// Wait for next tick or context cancellation
@@ -79,7 +76,7 @@ func Poll[O any](
 				case <-complete:
 					return
 				case <-ticker.C:
-					shouldPoll.Store(true)
+					shouldPoll = true
 				}
 			}
 		}()

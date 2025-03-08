@@ -46,7 +46,8 @@ func SendMany[T any](ctx context.Context, elems []T, out chan<- T) {
 }
 
 // NewCompleteChannel creates a new complete channel and a cancel function.
-// The cancel function can be used to close the channel.
+// The cancel function can be used to close the channel. Calling it multiple times
+// will not panic.
 //
 // Returns:
 //   - complete: The complete channel

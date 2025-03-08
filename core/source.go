@@ -50,7 +50,7 @@ type Source[O any] struct {
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		complete <-chan struct{},
-	) <-chan O
+	) <-chan Item[O]
 }
 
 // NewSource creates a new Source that produces items using the provided generate function.
@@ -74,7 +74,7 @@ type Source[O any] struct {
 // Returns:
 //   - A configured Source ready to be connected to a flow or sink
 func NewSource[O any](
-	generate func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc) <-chan O,
+	generate func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan Item[O],
 	opts ...SourceOption,
 ) *Source[O] {
 	cfg := &sourceConfig{}
@@ -89,14 +89,15 @@ func NewSource[O any](
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		complete <-chan struct{},
-	) <-chan O {
-		out := make(chan O, cfg.bufSize)
+	) <-chan Item[O] {
+		out := make(chan Item[O], cfg.bufSize)
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			defer close(out)
-			in := generate(ctx, complete, cancel)
+			in := generate(ctx, complete, cancel, wg)
+
 			for {
 				select {
 				case <-ctx.Done():

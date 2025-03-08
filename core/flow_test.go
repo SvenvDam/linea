@@ -15,16 +15,16 @@ func TestFlow(t *testing.T) {
 	tests := []struct {
 		name    string
 		bufSize int
-		test    func(t *testing.T, in chan<- int, out <-chan string, cancel context.CancelFunc)
+		test    func(t *testing.T, in chan<- Item[int], out <-chan Item[string], cancel context.CancelFunc)
 	}{
 		{
 			name:    "happy path - transforms all input values",
 			bufSize: 0,
-			test: func(t *testing.T, in chan<- int, out <-chan string, cancel context.CancelFunc) {
-				in <- 42
+			test: func(t *testing.T, in chan<- Item[int], out <-chan Item[string], cancel context.CancelFunc) {
+				in <- Item[int]{Value: 42}
 				res, ok := <-out
 				assert.True(t, ok)
-				assert.Equal(t, "value:42", res)
+				assert.Equal(t, "value:42", res.Value)
 
 				close(in)
 				_, ok = <-out
@@ -34,12 +34,12 @@ func TestFlow(t *testing.T) {
 		{
 			name:    "respects context cancellation",
 			bufSize: 0,
-			test: func(t *testing.T, in chan<- int, out <-chan string, cancel context.CancelFunc) {
+			test: func(t *testing.T, in chan<- Item[int], out <-chan Item[string], cancel context.CancelFunc) {
 				cancel()
 
 				go func() {
 					select {
-					case in <- 42:
+					case in <- Item[int]{Value: 42}:
 						assert.Fail(t, "items should not be accepted after stop!")
 					case <-time.After(20 * time.Millisecond):
 					}
@@ -51,15 +51,15 @@ func TestFlow(t *testing.T) {
 		{
 			name:    "handles buffered channel",
 			bufSize: 2,
-			test: func(t *testing.T, in chan<- int, out <-chan string, cancel context.CancelFunc) {
-				in <- 1
-				in <- 2
-				in <- 3
+			test: func(t *testing.T, in chan<- Item[int], out <-chan Item[string], cancel context.CancelFunc) {
+				in <- Item[int]{Value: 1}
+				in <- Item[int]{Value: 2}
+				in <- Item[int]{Value: 3}
 				close(in)
 
 				res := make([]string, 0, 3)
 				for v := range out {
-					res = append(res, v)
+					res = append(res, v.Value)
 				}
 				assert.Equal(t, []string{"value:1", "value:2", "value:3"}, res)
 			},
@@ -67,19 +67,19 @@ func TestFlow(t *testing.T) {
 		{
 			name:    "onElem can stop processing",
 			bufSize: 0,
-			test: func(t *testing.T, in chan<- int, out <-chan string, cancel context.CancelFunc) {
-				in <- 42 // This will be processed
+			test: func(t *testing.T, in chan<- Item[int], out <-chan Item[string], cancel context.CancelFunc) {
+				in <- Item[int]{Value: 42} // This will be processed
 				res, ok := <-out
 				assert.True(t, ok)
-				assert.Equal(t, "value:42", res)
+				assert.Equal(t, "value:42", res.Value)
 
-				in <- -1 // This will trigger early stop
+				in <- Item[int]{Value: -1} // This will trigger early stop
 				_, ok = <-out
 				assert.False(t, ok)
 
 				go func() {
 					select {
-					case in <- 43:
+					case in <- Item[int]{Value: 43}:
 						assert.Fail(t, "items should not be accepted after stop!")
 					case <-time.After(20 * time.Millisecond):
 					}
@@ -98,26 +98,24 @@ func TestFlow(t *testing.T) {
 			defer cancel()
 
 			wg := &sync.WaitGroup{}
-			in := make(chan int)
+			in := make(chan Item[int])
 			complete := make(chan struct{})
-			setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan int {
+			setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
 				return in
 			}
 
 			// Create flow that converts ints to strings
 			flow := NewFlow[int, string](
 				// onElem function
-				func(ctx context.Context, elem int, out chan<- string, cancel context.CancelFunc, complete CompleteFunc) bool {
+				func(ctx context.Context, elem int, out chan<- Item[string], cancel context.CancelFunc, complete CompleteFunc) bool {
 					if elem == -1 {
 						return false
 					}
-					out <- "value:" + strconv.Itoa(elem)
+					out <- Item[string]{Value: "value:" + strconv.Itoa(elem)}
 					return true
 				},
-				// onDone function
-				func(ctx context.Context, out chan<- string) {
-					// Nothing to clean up in this test
-				},
+				nil,
+				nil,
 				WithFlowBufSize(tt.bufSize),
 			)
 
@@ -140,24 +138,24 @@ func TestFlow(t *testing.T) {
 func TestFlowOnDone(t *testing.T) {
 	tests := []struct {
 		name          string
-		triggerMethod func(in chan<- int, cancel context.CancelFunc)
+		triggerMethod func(in chan<- Item[int], cancel context.CancelFunc)
 	}{
 		{
 			name: "called on input channel close",
-			triggerMethod: func(in chan<- int, cancel context.CancelFunc) {
+			triggerMethod: func(in chan<- Item[int], cancel context.CancelFunc) {
 				close(in)
 			},
 		},
 		{
 			name: "called on context cancellation",
-			triggerMethod: func(in chan<- int, cancel context.CancelFunc) {
+			triggerMethod: func(in chan<- Item[int], cancel context.CancelFunc) {
 				cancel()
 			},
 		},
 		{
 			name: "called when onElem returns false",
-			triggerMethod: func(in chan<- int, cancel context.CancelFunc) {
-				in <- -1 // Trigger value that causes onElem to return false
+			triggerMethod: func(in chan<- Item[int], cancel context.CancelFunc) {
+				in <- Item[int]{Value: -1} // Trigger value that causes onElem to return false
 			},
 		},
 	}
@@ -168,19 +166,20 @@ func TestFlowOnDone(t *testing.T) {
 			defer cancel()
 
 			wg := &sync.WaitGroup{}
-			in := make(chan int)
+			in := make(chan Item[int])
 			completeChan, _ := util.NewCompleteChannel()
 
-			setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan int {
+			setup := func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
 				return in
 			}
 			onDoneCalled := false
 
 			flow := NewFlow[int, string](
-				func(ctx context.Context, elem int, out chan<- string, cancel context.CancelFunc, complete CompleteFunc) bool {
+				func(ctx context.Context, elem int, out chan<- Item[string], cancel context.CancelFunc, complete CompleteFunc) bool {
 					return elem != -1
 				},
-				func(ctx context.Context, out chan<- string) {
+				nil,
+				func(ctx context.Context, out chan<- Item[string]) {
 					onDoneCalled = true
 				},
 			)

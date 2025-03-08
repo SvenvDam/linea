@@ -42,7 +42,7 @@ func TestSource(t *testing.T) {
 		config         SourceConfig
 		expectedResult []types.Message
 		duration       time.Duration
-		expectError    bool
+		expectedErr    error
 		setupMocks     func(t *testing.T, mock *mocks.MockSQSReceiveClient)
 	}{
 		{
@@ -56,7 +56,7 @@ func TestSource(t *testing.T) {
 			},
 			expectedResult: []types.Message{testMsg1, testMsg2, testMsg3},
 			duration:       200 * time.Millisecond,
-			expectError:    false,
+			expectedErr:    nil,
 			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSReceiveClient) {
 				expectedInput := &sqs.ReceiveMessageInput{
 					QueueUrl:            util.AsPtr("https://sqs.example.com/queue"),
@@ -92,7 +92,7 @@ func TestSource(t *testing.T) {
 			},
 			expectedResult: []types.Message{testMsg1},
 			duration:       150 * time.Millisecond,
-			expectError:    false,
+			expectedErr:    nil,
 			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSReceiveClient) {
 				expectedInput := &sqs.ReceiveMessageInput{
 					QueueUrl:            util.AsPtr("https://sqs.example.com/queue"),
@@ -135,7 +135,7 @@ func TestSource(t *testing.T) {
 			},
 			expectedResult: []types.Message{testMsg1},
 			duration:       150 * time.Millisecond,
-			expectError:    true,
+			expectedErr:    errors.New("connection error"),
 			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSReceiveClient) {
 				expectedInput := &sqs.ReceiveMessageInput{
 					QueueUrl:            util.AsPtr("https://sqs.example.com/queue"),
@@ -170,7 +170,7 @@ func TestSource(t *testing.T) {
 			},
 			expectedResult: []types.Message{testMsg1, testMsg2},
 			duration:       100 * time.Millisecond,
-			expectError:    false,
+			expectedErr:    nil,
 			setupMocks: func(t *testing.T, mockClient *mocks.MockSQSReceiveClient) {
 				expectedInput := &sqs.ReceiveMessageInput{
 					QueueUrl:            util.AsPtr("https://sqs.example.com/queue"),
@@ -221,11 +221,7 @@ func TestSource(t *testing.T) {
 			stream.Drain()
 			result := <-resultChan
 
-			if tt.expectError {
-				assert.False(t, result.Ok, "Expected stream to fail due to error")
-			} else {
-				assert.True(t, result.Ok, "Expected stream to complete successfully")
-			}
+			assert.Equal(t, tt.expectedErr, result.Err)
 		})
 	}
 }

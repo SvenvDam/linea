@@ -24,8 +24,13 @@ func FlatMap[I, O any](
 	fn func(I) []O,
 	opts ...core.FlowOption,
 ) *core.Flow[I, O] {
-	return core.NewFlow(func(ctx context.Context, elem I, out chan<- O, cancel context.CancelFunc, complete core.CompleteFunc) bool {
-		util.SendMany(ctx, fn(elem), out)
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- core.Item[O], cancel context.CancelFunc, complete core.CompleteFunc) bool {
+		res := fn(elem)
+		items := make([]core.Item[O], len(res))
+		for i, item := range res {
+			items[i] = core.Item[O]{Value: item}
+		}
+		util.SendMany(ctx, items, out)
 		return true
-	}, func(ctx context.Context, out chan<- O) {}, opts...)
+	}, nil, nil, opts...)
 }

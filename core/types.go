@@ -18,7 +18,7 @@ import (
 //   - T: The type of data flowing through the stream component
 //
 // Returns a channel that receives stream data of type T
-type setupFunc[T any] func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan T
+type setupFunc[T any] func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[T]
 
 // CompleteFunc is a function type used to signal graceful shutdown.
 // It can be called multiple times, but will only close the channel once.

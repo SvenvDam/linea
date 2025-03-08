@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/svenvdam/linea/compose"
 	"github.com/svenvdam/linea/sinks"
-	"github.com/svenvdam/linea/test"
 )
 
 func TestChan(t *testing.T) {
@@ -40,16 +39,14 @@ func TestChan(t *testing.T) {
 				close(ch)
 			}()
 
-			stream := compose.SourceThroughFlowToSink(
+			stream := compose.SourceToSink(
 				Chan(ch),
-				test.CheckItems(t, func(t *testing.T, seen []int) {
-					assert.Equal(t, tt.want, seen)
-				}),
-				sinks.Noop[int](),
+				sinks.Slice[int](),
 			)
 
 			res := <-stream.Run(ctx)
-			assert.True(t, res.Ok)
+			assert.NoError(t, res.Err)
+			assert.Equal(t, tt.want, res.Value)
 		})
 	}
 }

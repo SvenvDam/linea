@@ -13,10 +13,10 @@ import (
 
 func TestCancel(t *testing.T) {
 	tests := []struct {
-		name   string
-		setup  func(context.Context) context.Context
-		cancel bool
-		ok     bool
+		name        string
+		setup       func(context.Context) context.Context
+		cancel      bool
+		expectedErr error
 	}{
 		{
 			name: "cancelled on start",
@@ -25,24 +25,24 @@ func TestCancel(t *testing.T) {
 				cancel()
 				return ctx
 			},
-			cancel: false,
-			ok:     false,
+			cancel:      false,
+			expectedErr: context.Canceled,
 		},
 		{
 			name: "cancel after start",
 			setup: func(ctx context.Context) context.Context {
 				return ctx
 			},
-			cancel: true,
-			ok:     false,
+			cancel:      true,
+			expectedErr: context.Canceled,
 		},
 		{
 			name: "not cancelled",
 			setup: func(ctx context.Context) context.Context {
 				return ctx
 			},
-			cancel: false,
-			ok:     true,
+			cancel:      false,
+			expectedErr: nil,
 		},
 	}
 
@@ -63,7 +63,11 @@ func TestCancel(t *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 			stream.Drain()
 			res := <-resChan
-			assert.Equal(t, tt.ok, res.Ok)
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, res.Err, tt.expectedErr)
+			} else {
+				assert.NoError(t, res.Err)
+			}
 		})
 	}
 }

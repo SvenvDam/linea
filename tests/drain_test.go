@@ -48,7 +48,7 @@ func TestDrain(t *testing.T) {
 
 			res := <-resChan
 			stream.AwaitDone()
-			assert.True(t, res.Ok)
+			assert.NoError(t, res.Err)
 			assert.Greater(t, len(res.Value), 5)
 
 			_, ok := <-resChan

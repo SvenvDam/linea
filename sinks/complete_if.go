@@ -24,11 +24,12 @@ func CompleteIf[I any](
 ) *core.Sink[I, struct{}] {
 	return core.NewSink(
 		struct{}{},
-		func(ctx context.Context, in I, acc struct{}, cancel context.CancelFunc, complete core.CompleteFunc) struct{} {
+		func(ctx context.Context, in I, acc struct{}, cancel context.CancelFunc, complete core.CompleteFunc) (struct{}, bool) {
 			if pred(in) {
 				complete()
 			}
-			return acc
+			return acc, true
 		},
+		nil,
 	)
 }

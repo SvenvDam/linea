@@ -34,7 +34,7 @@ type Flow[I, O any] struct {
 		wg *sync.WaitGroup,
 		complete <-chan struct{},
 		setupUpstream setupFunc[I],
-	) <-chan O
+	) <-chan Item[O]
 }
 
 // FlowOption is a function type for configuring Flow behavior.
@@ -98,11 +98,23 @@ func WithFlowBufSize(size int) FlowOption {
 // Returns:
 //   - A new Flow instance that will perform the specified transformation
 func NewFlow[I, O any](
-	onElem func(ctx context.Context, elem I, out chan<- O, cancel context.CancelFunc, complete CompleteFunc) bool,
-	onDone func(ctx context.Context, out chan<- O),
+	onElem func(ctx context.Context, elem I, out chan<- Item[O], cancel context.CancelFunc, complete CompleteFunc) bool,
+	onErr func(ctx context.Context, err error, out chan<- Item[O], cancel context.CancelFunc, complete CompleteFunc) bool,
+	onDone func(ctx context.Context, out chan<- Item[O]),
 	opts ...FlowOption,
 ) *Flow[I, O] {
 	cfg := &flowConfig{}
+
+	if onErr == nil {
+		onErr = func(ctx context.Context, err error, out chan<- Item[O], cancel context.CancelFunc, complete CompleteFunc) bool {
+			util.Send(ctx, Item[O]{Err: err}, out)
+			return false
+		}
+	}
+
+	if onDone == nil {
+		onDone = func(ctx context.Context, out chan<- Item[O]) {}
+	}
 
 	// Apply all options
 	for _, opt := range opts {
@@ -115,8 +127,8 @@ func NewFlow[I, O any](
 		wg *sync.WaitGroup,
 		complete <-chan struct{},
 		setupUpstream setupFunc[I],
-	) <-chan O {
-		out := make(chan O, cfg.bufSize)
+	) <-chan Item[O] {
+		out := make(chan Item[O], cfg.bufSize)
 		completeUpstreamChan, completeUpstream := util.NewCompleteChannel()
 		in := setupUpstream(ctx, cancel, wg, completeUpstreamChan)
 
@@ -125,6 +137,8 @@ func NewFlow[I, O any](
 			defer wg.Done()
 			defer close(out)
 			defer onDone(ctx, out)
+			defer completeUpstream()
+
 			for {
 				select {
 				case <-ctx.Done():
@@ -135,9 +149,14 @@ func NewFlow[I, O any](
 					if !ok {
 						return
 					}
-					ok = onElem(ctx, elem, out, cancel, completeUpstream)
-					if !ok {
-						completeUpstream()
+
+					var proceed bool
+					if elem.Err != nil {
+						proceed = onErr(ctx, elem.Err, out, cancel, completeUpstream)
+					} else {
+						proceed = onElem(ctx, elem.Value, out, cancel, completeUpstream)
+					}
+					if !proceed {
 						return
 					}
 				}

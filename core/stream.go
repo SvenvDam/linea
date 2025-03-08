@@ -27,7 +27,7 @@ type Stream[R any] struct {
 	cancel    context.CancelFunc
 	complete  context.CancelFunc
 	wg        *sync.WaitGroup
-	res       <-chan Result[R]
+	res       <-chan Item[R]
 	run       func(
 		ctx context.Context,
 		cancel context.CancelFunc,
@@ -63,7 +63,7 @@ func newStream[R any](
 		res:       nil,
 	}
 
-	out := make(chan Result[R])
+	out := make(chan Item[R], 1)
 	stream.res = out
 
 	stream.run = func(
@@ -86,12 +86,13 @@ func newStream[R any](
 
 			select {
 			case <-ctx.Done():
+				out <- Item[R]{Err: ctx.Err()}
 				return
 			case r, ok := <-res:
 				if !ok {
 					return
 				}
-				util.Send(ctx, Result[R]{Value: r, Ok: true}, out)
+				util.Send(ctx, r, out)
 			}
 		}()
 	}
@@ -105,8 +106,8 @@ func newStream[R any](
 // Parameters:
 //   - ctx: Context used to control the stream's lifecycle
 //
-// Returns a channel that will receive Result[R] values containing the stream's output
-func (s *Stream[R]) Run(ctx context.Context) <-chan Result[R] {
+// Returns a channel that will receive Item[R] values containing the stream's output
+func (s *Stream[R]) Run(ctx context.Context) <-chan Item[R] {
 	if !s.isRunning.Load() {
 		ctx, cancel := context.WithCancel(ctx)
 		s.cancel = cancel

@@ -61,7 +61,7 @@ func TestCompleteIf(t *testing.T) {
 			)
 
 			res := <-stream.Run(ctx)
-			assert.Equal(t, tt.ok, res.Ok)
+			assert.NoError(t, res.Err)
 			assert.Equal(t, tt.expect, res.Value)
 		})
 	}
@@ -96,7 +96,7 @@ func TestCompleteIfWithInFlightMessages(t *testing.T) {
 	)
 
 	res := <-stream.Run(ctx)
-	assert.True(t, res.Ok)
+	assert.NoError(t, res.Err)
 
 	// Verify all items were processed, demonstrating that CompleteIf allows
 	// in-flight items to be processed unlike CancelIf which would stop immediately

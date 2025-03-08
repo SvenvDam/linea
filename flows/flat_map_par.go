@@ -29,7 +29,7 @@ func FlatMapPar[I, O any](
 ) *core.Flow[I, O] {
 	sem := make(chan struct{}, parallelism)
 	wg := sync.WaitGroup{}
-	return core.NewFlow(func(ctx context.Context, elem I, out chan<- O, cancel context.CancelFunc, complete core.CompleteFunc) bool {
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- core.Item[O], cancel context.CancelFunc, complete core.CompleteFunc) bool {
 		sem <- struct{}{} // wait for a slot
 		wg.Add(1)
 		go func() {
@@ -37,10 +37,15 @@ func FlatMapPar[I, O any](
 				wg.Done()
 				<-sem // release the slot
 			}()
-			util.SendMany(ctx, fn(elem), out)
+			res := fn(elem)
+			items := make([]core.Item[O], len(res))
+			for i, item := range res {
+				items[i] = core.Item[O]{Value: item}
+			}
+			util.SendMany(ctx, items, out)
 		}()
 		return true
-	}, func(ctx context.Context, out chan<- O) {
+	}, nil, func(ctx context.Context, out chan<- core.Item[O]) {
 		wg.Wait() // wait for all goroutines to finish
 	}, opts...)
 }

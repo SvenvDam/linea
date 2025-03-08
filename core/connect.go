@@ -28,13 +28,13 @@ func ConnectFlows[I, O1, O2 any](
 		wg *sync.WaitGroup,
 		complete <-chan struct{},
 		setupUpstream setupFunc[I],
-	) <-chan O2 {
+	) <-chan Item[O2] {
 		return flow2.setup(
 			ctx,
 			cancel,
 			wg,
 			complete,
-			func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete_ <-chan struct{}) <-chan O1 {
+			func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete_ <-chan struct{}) <-chan Item[O1] {
 				return flow1.setup(ctx, cancel, wg, complete_, setupUpstream)
 			},
 		)
@@ -63,7 +63,7 @@ func AppendFlowToSource[I, O any](source *Source[I], flow *Flow[I, O]) *Source[O
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		complete <-chan struct{},
-	) <-chan O {
+	) <-chan Item[O] {
 		return flow.setup(ctx, cancel, wg, complete, source.setup)
 	}
 
@@ -93,13 +93,13 @@ func PrependFlowToSink[I, O, R any](flow *Flow[I, O], sink *Sink[O, R]) *Sink[I,
 		wg *sync.WaitGroup,
 		complete <-chan struct{},
 		setupUpstream setupFunc[I],
-	) <-chan R {
+	) <-chan Item[R] {
 		return sink.setup(
 			ctx,
 			cancel,
 			wg,
 			complete,
-			func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete_ <-chan struct{}) <-chan O {
+			func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete_ <-chan struct{}) <-chan Item[O] {
 				return flow.setup(ctx, cancel, wg, complete_, setupUpstream)
 			},
 		)
@@ -129,7 +129,7 @@ func ConnectSourceToSink[I, R any](source *Source[I], sink *Sink[I, R]) *Stream[
 		cancel context.CancelFunc,
 		wg *sync.WaitGroup,
 		complete <-chan struct{},
-	) <-chan R {
+	) <-chan Item[R] {
 		return sink.setup(ctx, cancel, wg, complete, source.setup)
 	}
 

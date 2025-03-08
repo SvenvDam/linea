@@ -55,7 +55,7 @@ func TestCompleteIf(t *testing.T) {
 			)
 
 			res := <-stream.Run(ctx)
-			assert.Equal(t, tt.ok, res.Ok)
+			assert.NoError(t, res.Err)
 		})
 	}
 }
@@ -86,5 +86,5 @@ func TestCompleteIfWithInFlightMessages(t *testing.T) {
 	)
 
 	res := <-stream.Run(ctx)
-	assert.True(t, res.Ok)
+	assert.NoError(t, res.Err)
 }
