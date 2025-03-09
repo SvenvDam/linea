@@ -68,8 +68,10 @@ func TestTryMap(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 
+			mapFunc := tt.mapFn // local copy to avoid data race
+
 			mapErrFlow := TryMap(func(i int) (string, error) {
-				return tt.mapFn(i)
+				return mapFunc(i)
 			})
 
 			stream := compose.SourceThroughFlowToSink(
