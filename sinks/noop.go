@@ -1,8 +1,6 @@
 package sinks
 
 import (
-	"context"
-
 	"github.com/svenvdam/linea/core"
 )
 
@@ -15,11 +13,5 @@ import (
 //
 // Returns a Sink that discards all items
 func Noop[I any]() *core.Sink[I, struct{}] {
-	return core.NewSink(
-		struct{}{},
-		func(ctx context.Context, in I, acc struct{}, cancel context.CancelFunc, complete core.CompleteFunc) (struct{}, bool) {
-			return acc, true
-		},
-		nil,
-	)
+	return ForEach(func(_ I) {})
 }
