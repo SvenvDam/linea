@@ -116,7 +116,7 @@ func NewSink[I, R any](
 		complete <-chan struct{},
 		setupUpstream setupFunc[I],
 	) <-chan Item[R] {
-		out := make(chan Item[R])
+		out := make(chan Item[R], 1)
 
 		completeUpstreamChan, completeUpstream := util.NewCompleteChannel()
 
@@ -131,13 +131,12 @@ func NewSink[I, R any](
 			for {
 				select {
 				case <-ctx.Done():
-					util.Send(ctx, acc, out)
 					return
 				case <-complete:
 					completeUpstream()
 				case elem, ok := <-in:
 					if !ok {
-						util.Send(ctx, acc, out)
+						out <- acc
 						return
 					}
 
@@ -148,7 +147,7 @@ func NewSink[I, R any](
 						acc.Value, proceed = onElem(ctx, elem.Value, acc.Value, cancel, completeUpstream)
 					}
 					if !proceed {
-						util.Send(ctx, acc, out)
+						out <- acc
 						return
 					}
 				}

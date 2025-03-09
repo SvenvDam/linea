@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 
@@ -92,9 +93,7 @@ func newStream[R any](
 			defer close(out)
 			defer cancel()
 			defer wg.Done()
-			defer func() {
-				stream.isRunning.Store(false)
-			}()
+			defer stream.isRunning.Store(false)
 
 			select {
 			case <-ctx.Done():
@@ -102,9 +101,15 @@ func newStream[R any](
 				return
 			case r, ok := <-res:
 				if !ok {
+					if ctx.Err() != nil {
+						out <- Item[R]{Err: ctx.Err()}
+					} else {
+						out <- Item[R]{Err: errors.New("result channel closed unexpectedly")}
+					}
 					return
 				}
-				util.Send(ctx, r, out)
+				out <- r
+				return
 			}
 		}()
 	}
