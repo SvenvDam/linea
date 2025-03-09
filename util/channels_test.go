@@ -143,3 +143,51 @@ func TestSendMany(t *testing.T) {
 		})
 	}
 }
+
+func TestNewCompleteChannel(t *testing.T) {
+	tests := []struct {
+		name string
+		test func(t *testing.T)
+	}{
+		{
+			name: "channel returns immediately after calling complete function",
+			test: func(t *testing.T) {
+				complete, completeFn := NewCompleteChannel()
+
+				// Channel should be open initially
+				select {
+				case <-complete:
+					assert.Fail(t, "complete channel should not be closed initially")
+				case <-time.After(10 * time.Millisecond):
+					// This is expected
+				}
+
+				// Call the complete function
+				completeFn()
+
+				// Channel should now be closed
+				select {
+				case <-complete:
+					// This is expected
+				case <-time.After(10 * time.Millisecond):
+					assert.Fail(t, "complete channel should be closed after calling completeFn")
+				}
+			},
+		},
+		{
+			name: "calling complete function multiple times doesn't panic",
+			test: func(t *testing.T) {
+				_, completeFn := NewCompleteChannel()
+
+				assert.NotPanics(t, func() {
+					completeFn()
+					completeFn()
+				})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, tt.test)
+	}
+}
