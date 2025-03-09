@@ -11,34 +11,34 @@ import (
 
 func TestCancelIf(t *testing.T) {
 	tests := []struct {
-		name     string
-		elements []int
-		pred     func(int) bool
-		ok       bool
+		name        string
+		elements    []int
+		pred        func(int) bool
+		expectedErr error
 	}{
 		{
-			name:     "cancels on first matching item",
-			elements: []int{1, 2, 3, 4, 5},
-			pred:     func(i int) bool { return i == 3 },
-			ok:       false,
+			name:        "cancels on first matching item",
+			elements:    []int{1, 2, 3, 4, 5},
+			pred:        func(i int) bool { return i == 3 },
+			expectedErr: context.Canceled,
 		},
 		{
-			name:     "passes all items when predicate never matches",
-			elements: []int{1, 2, 3},
-			pred:     func(i int) bool { return false },
-			ok:       true,
+			name:        "passes all items when predicate never matches",
+			elements:    []int{1, 2, 3},
+			pred:        func(i int) bool { return false },
+			expectedErr: nil,
 		},
 		{
-			name:     "cancels on first item",
-			elements: []int{1, 2, 3},
-			pred:     func(i int) bool { return true },
-			ok:       false,
+			name:        "cancels on first item",
+			elements:    []int{1, 2, 3},
+			pred:        func(i int) bool { return true },
+			expectedErr: context.Canceled,
 		},
 		{
-			name:     "handles empty input",
-			elements: []int{},
-			pred:     func(i int) bool { return true },
-			ok:       true,
+			name:        "handles empty input",
+			elements:    []int{},
+			pred:        func(i int) bool { return true },
+			expectedErr: nil,
 		},
 	}
 
@@ -52,7 +52,11 @@ func TestCancelIf(t *testing.T) {
 			)
 
 			res := <-stream.Run(ctx)
-			assert.Equal(t, tt.ok, res.Ok)
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, res.Err, tt.expectedErr)
+			} else {
+				assert.NoError(t, res.Err)
+			}
 		})
 	}
 }

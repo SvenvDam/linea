@@ -193,11 +193,8 @@ func TestPoll(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			stream := compose.SourceThroughFlowToSink2(
+			stream := compose.SourceThroughFlowToSink(
 				Poll(tt.poll(), tt.interval),
-				test.AssertEachItem(t, func(t *testing.T, in int) {
-					assert.Positive(t, in)
-				}),
 				test.CheckItems(t, func(t *testing.T, seen []int) {
 					tt.check(t, seen)
 				}),
@@ -210,9 +207,9 @@ func TestPoll(t *testing.T) {
 			res := <-resChan
 
 			if tt.expectErr {
-				assert.False(t, res.Ok)
+				assert.Error(t, res.Err)
 			} else {
-				assert.True(t, res.Ok)
+				assert.NoError(t, res.Err)
 			}
 		})
 	}

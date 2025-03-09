@@ -99,6 +99,7 @@ Streams in Linea follow a simple lifecycle model that helps manage resources and
    - All internal goroutines are properly terminated
    - Channels are closed in the correct order
    - Resources are released
+   - Resource cleanup can be awaited through `stream.AwaitDone()`
 
 ## Shutdown Options
 
@@ -145,19 +146,3 @@ func processWithShutdown(data []int) {
     }
 }
 ```
-
-**Shutdown Methods:**
-- `stream.Cancel()`: Immediate shutdown that stops all processing. Results in `Ok: false`. This method blocks until all internal goroutines have been terminated, ensuring proper resource cleanup.
-- `stream.Drain()`: Graceful shutdown that processes remaining items. Results in `Ok: true` if all items were processed.
-- Context cancellation: Cancels via context, similar to `Cancel()`. Results in `Ok: false`.
-
-**Understanding Results:**
-- `result.Ok == true`: Indicates the stream completed successfully, processing all items
-- `result.Ok == false`: Indicates the stream was cancelled before completion
-- `result.Value`: Contains the processed data when `Ok` is true
-
-**Best Practices:**
-- Use `defer cancel()` when creating cancellable contexts
-- Check `result.Ok` to determine if all items were processed
-- Use `Drain()` when you want to ensure all items in the pipeline are processed
-- Use `Cancel()` when immediate shutdown is required

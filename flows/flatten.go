@@ -21,8 +21,13 @@ import (
 func Flatten[I any](
 	opts ...core.FlowOption,
 ) *core.Flow[[]I, I] {
-	return core.NewFlow(func(ctx context.Context, elem []I, out chan<- I, cancel context.CancelFunc) bool {
-		util.SendMany(ctx, elem, out)
+	return core.NewFlow(func(ctx context.Context, elem []I, out chan<- core.Item[I], cancel context.CancelFunc, complete core.CompleteFunc) bool {
+		items := make([]core.Item[I], len(elem))
+		for i, item := range elem {
+			items[i] = core.Item[I]{Value: item}
+		}
+		util.SendMany(ctx, items, out)
+
 		return true
-	}, func(ctx context.Context, out chan<- I) {}, opts...)
+	}, nil, nil, opts...)
 }

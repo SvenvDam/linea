@@ -22,10 +22,10 @@ func Filter[I any](
 	pred func(I) bool,
 	opts ...core.FlowOption,
 ) *core.Flow[I, I] {
-	return core.NewFlow(func(ctx context.Context, elem I, out chan<- I, cancel context.CancelFunc) bool {
+	return core.NewFlow(func(ctx context.Context, elem I, out chan<- core.Item[I], cancel context.CancelFunc, complete core.CompleteFunc) bool {
 		if pred(elem) {
-			util.Send(ctx, elem, out)
+			util.Send(ctx, core.Item[I]{Value: elem}, out)
 		}
 		return true
-	}, func(ctx context.Context, out chan<- I) {}, opts...)
+	}, nil, nil, opts...)
 }
