@@ -12,16 +12,24 @@ import (
 
 func TestConnectFlows(t *testing.T) {
 	// Create two simple flows: int -> string -> int
-	flow1 := NewFlow(func(ctx context.Context, elem int, out chan<- Item[string], cancel context.CancelFunc, complete CompleteFunc) bool {
-		out <- Item[string]{Value: strconv.Itoa(elem)}
-		return true
-	}, nil, nil)
+	flow1 := NewFlow(
+		func(ctx context.Context, elem int, out chan<- Item[string], cancel context.CancelFunc, complete CompleteFunc) bool {
+			out <- Item[string]{Value: strconv.Itoa(elem)}
+			return true
+		},
+		nil,
+		nil,
+	)
 
-	flow2 := NewFlow(func(ctx context.Context, elem string, out chan<- Item[int], cancel context.CancelFunc, complete CompleteFunc) bool {
-		val, _ := strconv.Atoi(elem)
-		out <- Item[int]{Value: val * 2}
-		return true
-	}, nil, nil)
+	flow2 := NewFlow(
+		func(ctx context.Context, elem string, out chan<- Item[int], cancel context.CancelFunc, complete CompleteFunc) bool {
+			val, _ := strconv.Atoi(elem)
+			out <- Item[int]{Value: val * 2}
+			return true
+		},
+		nil,
+		nil,
+	)
 
 	// Connect the flows
 	combined := ConnectFlows(flow1, flow2)
@@ -57,20 +65,26 @@ func TestConnectFlows(t *testing.T) {
 
 func TestAppendFlowToSource(t *testing.T) {
 	// Create a simple source that emits one number
-	source := NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan Item[int] {
-		out := make(chan Item[int])
-		go func() {
-			defer close(out)
-			out <- Item[int]{Value: 42}
-		}()
-		return out
-	})
+	source := NewSource(
+		func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan Item[int] {
+			out := make(chan Item[int])
+			go func() {
+				defer close(out)
+				out <- Item[int]{Value: 42}
+			}()
+			return out
+		},
+	)
 
 	// Create a flow that doubles the number
-	flow := NewFlow(func(ctx context.Context, elem int, out chan<- Item[int], cancel context.CancelFunc, complete CompleteFunc) bool {
-		out <- Item[int]{Value: elem * 2}
-		return true
-	}, nil, nil)
+	flow := NewFlow(
+		func(ctx context.Context, elem int, out chan<- Item[int], cancel context.CancelFunc, complete CompleteFunc) bool {
+			out <- Item[int]{Value: elem * 2}
+			return true
+		},
+		nil,
+		nil,
+	)
 
 	// Combine source and flow
 	combined := AppendFlowToSource(source, flow)
@@ -94,13 +108,18 @@ func TestAppendFlowToSource(t *testing.T) {
 
 func TestPrependFlowToSink(t *testing.T) {
 	// Create a flow that converts int to string
-	flow := NewFlow(func(ctx context.Context, elem int, out chan<- Item[string], cancel context.CancelFunc, complete CompleteFunc) bool {
-		out <- Item[string]{Value: strconv.Itoa(elem)}
-		return true
-	}, nil, nil)
+	flow := NewFlow(
+		func(ctx context.Context, elem int, out chan<- Item[string], cancel context.CancelFunc, complete CompleteFunc) bool {
+			out <- Item[string]{Value: strconv.Itoa(elem)}
+			return true
+		},
+		nil,
+		nil,
+	)
 
 	// Create a sink that concatenates strings
-	sink := NewSink("",
+	sink := NewSink(
+		"",
 		func(ctx context.Context, elem string, acc string, cancel context.CancelFunc, complete CompleteFunc) (string, bool) {
 			return acc + elem, true
 		},
@@ -139,17 +158,20 @@ func TestPrependFlowToSink(t *testing.T) {
 
 func TestConnectSourceToSink(t *testing.T) {
 	// Create a source that emits one number
-	source := NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan Item[int] {
-		out := make(chan Item[int])
-		go func() {
-			defer close(out)
-			out <- Item[int]{Value: 42}
-		}()
-		return out
-	})
+	source := NewSource(
+		func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan Item[int] {
+			out := make(chan Item[int])
+			go func() {
+				defer close(out)
+				out <- Item[int]{Value: 42}
+			}()
+			return out
+		},
+	)
 
 	// Create a sink that converts to string
-	sink := NewSink("",
+	sink := NewSink(
+		"",
 		func(ctx context.Context, elem int, acc string, cancel context.CancelFunc, complete CompleteFunc) (string, bool) {
 			return acc + strconv.Itoa(elem), true
 		},

@@ -76,9 +76,12 @@ func TestSource(t *testing.T) {
 			drain := make(chan struct{})
 
 			// Create source with test generator
-			source := NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan Item[int] {
-				return in
-			}, WithSourceBufSize(tt.bufSize))
+			source := NewSource(
+				func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan Item[int] {
+					return in
+				},
+				WithSourceBufSize(tt.bufSize),
+			)
 
 			// Start source
 			out := source.setup(ctx, cancel, wg, drain)
