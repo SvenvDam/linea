@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/svenvdam/linea/compose"
@@ -56,11 +57,17 @@ func TestCancel(t *testing.T) {
 			)
 
 			resChan := stream.Run(ctx)
+
+			time.Sleep(10 * time.Millisecond)
+
 			if tt.cancel {
 				stream.Cancel()
 			} else {
 				stream.Drain()
 			}
+
+			time.Sleep(10 * time.Millisecond)
+
 			res := <-resChan
 			assert.Equal(t, tt.expectedErr, res.Err)
 		})
