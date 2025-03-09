@@ -8,7 +8,7 @@ all: fmt tidy lint test
 fmt:
 	@for module in $(GO_MODULES); do \
 		echo "Formatting $$module"; \
-		(cd $$module && go fmt ./...); \
+		(cd $$module && go tool golines -m 120 --ignore-generated -w .); \
 	done
 
 .PHONY: test
@@ -37,9 +37,17 @@ lint:
 generate: clean
 	@for module in $(GO_MODULES); do \
 		echo "Generating mocks for $$module"; \
-		(cd $$module && mockery); \
+		(cd $$module && go tool mockery); \
 	done
 
 .PHONY: clean
 clean:
 	find . -name "mock_*.go" -type f -delete
+
+.PHONY: install-tools
+install-tools:
+	@for module in $(GO_MODULES); do \
+		echo "Installing tools for $$module"; \
+		(cd $$module && go get -tool github.com/vektra/mockery/v2); \
+		(cd $$module && go get -tool github.com/segmentio/golines@latest); \
+	done

@@ -29,23 +29,27 @@ func FlatMapPar[I, O any](
 ) *core.Flow[I, O] {
 	sem := make(chan struct{}, parallelism)
 	wg := sync.WaitGroup{}
-	return core.NewFlow(func(ctx context.Context, elem I, out chan<- core.Item[O], cancel context.CancelFunc, complete core.CompleteFunc) bool {
-		sem <- struct{}{} // wait for a slot
-		wg.Add(1)
-		go func() {
-			defer func() {
-				wg.Done()
-				<-sem // release the slot
+	return core.NewFlow(
+		func(ctx context.Context, elem I, out chan<- core.Item[O], cancel context.CancelFunc, complete core.CompleteFunc) bool {
+			sem <- struct{}{} // wait for a slot
+			wg.Add(1)
+			go func() {
+				defer func() {
+					wg.Done()
+					<-sem // release the slot
+				}()
+				res := fn(elem)
+				items := make([]core.Item[O], len(res))
+				for i, item := range res {
+					items[i] = core.Item[O]{Value: item}
+				}
+				util.SendMany(ctx, items, out)
 			}()
-			res := fn(elem)
-			items := make([]core.Item[O], len(res))
-			for i, item := range res {
-				items[i] = core.Item[O]{Value: item}
-			}
-			util.SendMany(ctx, items, out)
-		}()
-		return true
-	}, nil, func(ctx context.Context, out chan<- core.Item[O]) {
-		wg.Wait() // wait for all goroutines to finish
-	}, opts...)
+			return true
+		},
+		nil,
+		func(ctx context.Context, out chan<- core.Item[O]) {
+			wg.Wait() // wait for all goroutines to finish
+		},
+		opts...)
 }

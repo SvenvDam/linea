@@ -35,53 +35,55 @@ func Poll[O any](
 	interval time.Duration,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan core.Item[O] {
-		out := make(chan core.Item[O])
-		wg.Add(1)
-		go func() {
-			defer close(out)
-			defer wg.Done()
+	return core.NewSource(
+		func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan core.Item[O] {
+			out := make(chan core.Item[O])
+			wg.Add(1)
+			go func() {
+				defer close(out)
+				defer wg.Done()
 
-			ticker := time.NewTicker(interval)
-			defer ticker.Stop()
+				ticker := time.NewTicker(interval)
+				defer ticker.Stop()
 
-			shouldPoll := true
+				shouldPoll := true
 
-			for {
-				if shouldPoll {
-					val, more, err := poll(ctx)
+				for {
+					if shouldPoll {
+						val, more, err := poll(ctx)
 
-					if err != nil {
-						util.Send(ctx, core.Item[O]{Err: err}, out)
+						if err != nil {
+							util.Send(ctx, core.Item[O]{Err: err}, out)
+						}
+
+						// Send the value if it's not nil
+						if val != nil {
+							util.Send(ctx, core.Item[O]{Value: *val}, out)
+						}
+
+						// Reset the ticker based on whether there are more items to poll immediately
+						if more {
+							ticker.Reset(time.Nanosecond)
+						} else {
+							ticker.Reset(interval)
+						}
+
+						// Wait for next tick before polling again
+						shouldPoll = false
 					}
 
-					// Send the value if it's not nil
-					if val != nil {
-						util.Send(ctx, core.Item[O]{Value: *val}, out)
+					// Wait for next tick or context cancellation
+					select {
+					case <-ctx.Done():
+						return
+					case <-complete:
+						return
+					case <-ticker.C:
+						shouldPoll = true
 					}
-
-					// Reset the ticker based on whether there are more items to poll immediately
-					if more {
-						ticker.Reset(time.Nanosecond)
-					} else {
-						ticker.Reset(interval)
-					}
-
-					// Wait for next tick before polling again
-					shouldPoll = false
 				}
-
-				// Wait for next tick or context cancellation
-				select {
-				case <-ctx.Done():
-					return
-				case <-complete:
-					return
-				case <-ticker.C:
-					shouldPoll = true
-				}
-			}
-		}()
-		return out
-	}, opts...)
+			}()
+			return out
+		},
+		opts...)
 }

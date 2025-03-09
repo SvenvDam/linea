@@ -29,18 +29,22 @@ func MapPar[I, O any](
 ) *core.Flow[I, O] {
 	sem := make(chan struct{}, parallelism)
 	wg := sync.WaitGroup{}
-	return core.NewFlow(func(ctx context.Context, elem I, out chan<- core.Item[O], cancel context.CancelFunc, complete core.CompleteFunc) bool {
-		sem <- struct{}{} // wait for a slot
-		wg.Add(1)
-		go func() {
-			defer func() {
-				wg.Done()
-				<-sem // release the slot
+	return core.NewFlow(
+		func(ctx context.Context, elem I, out chan<- core.Item[O], cancel context.CancelFunc, complete core.CompleteFunc) bool {
+			sem <- struct{}{} // wait for a slot
+			wg.Add(1)
+			go func() {
+				defer func() {
+					wg.Done()
+					<-sem // release the slot
+				}()
+				util.Send(ctx, core.Item[O]{Value: fn(elem)}, out)
 			}()
-			util.Send(ctx, core.Item[O]{Value: fn(elem)}, out)
-		}()
-		return true
-	}, nil, func(ctx context.Context, out chan<- core.Item[O]) {
-		wg.Wait() // wait for all goroutines to finish
-	}, opts...)
+			return true
+		},
+		nil,
+		func(ctx context.Context, out chan<- core.Item[O]) {
+			wg.Wait() // wait for all goroutines to finish
+		},
+		opts...)
 }

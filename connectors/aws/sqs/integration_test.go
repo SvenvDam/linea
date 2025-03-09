@@ -110,7 +110,12 @@ func TestSqsStream(t *testing.T) {
 }
 
 // setupQueue creates an SQS queue and returns its URL
-func setupQueue(ctx context.Context, client *sqs.Client, queueName string, visibilityTimeoutSeconds int) (string, error) {
+func setupQueue(
+	ctx context.Context,
+	client *sqs.Client,
+	queueName string,
+	visibilityTimeoutSeconds int,
+) (string, error) {
 	resp, err := client.CreateQueue(ctx, &sqs.CreateQueueInput{
 		QueueName: aws.String(queueName),
 		Attributes: map[string]string{

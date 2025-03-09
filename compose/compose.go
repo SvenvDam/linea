@@ -103,7 +103,11 @@ func SourceThroughFlow3[I, O1, O2, O3 any](
 //   - sink: Sink consuming items of type O and producing result R
 //
 // Returns a Stream that will produce a result of type R when run
-func SourceThroughFlowToSink[I, O, R any](source *core.Source[I], flow *core.Flow[I, O], sink *core.Sink[O, R]) *core.Stream[R] {
+func SourceThroughFlowToSink[I, O, R any](
+	source *core.Source[I],
+	flow *core.Flow[I, O],
+	sink *core.Sink[O, R],
+) *core.Stream[R] {
 	s := core.AppendFlowToSource(source, flow)
 	return core.ConnectSourceToSink(s, sink)
 }

@@ -10,7 +10,11 @@ import (
 
 // SQSSendClient defines the interface for SQS operations needed by the SendFlow
 type SQSSendClient interface {
-	SendMessage(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error)
+	SendMessage(
+		ctx context.Context,
+		params *sqs.SendMessageInput,
+		optFns ...func(*sqs.Options),
+	) (*sqs.SendMessageOutput, error)
 }
 
 // SendMessageResult represents the result of sending a message to SQS

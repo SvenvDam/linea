@@ -22,22 +22,24 @@ func Slice[O any](
 	slice []O,
 	opts ...core.SourceOption,
 ) *core.Source[O] {
-	return core.NewSource(func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan core.Item[O] {
-		out := make(chan core.Item[O])
-		wg.Add(1)
-		go func() {
-			defer close(out)
-			defer wg.Done()
-			for _, elem := range slice {
-				select {
-				case <-ctx.Done():
-					return
-				case <-complete:
-					return
-				case out <- core.Item[O]{Value: elem}:
+	return core.NewSource(
+		func(ctx context.Context, complete <-chan struct{}, cancel context.CancelFunc, wg *sync.WaitGroup) <-chan core.Item[O] {
+			out := make(chan core.Item[O])
+			wg.Add(1)
+			go func() {
+				defer close(out)
+				defer wg.Done()
+				for _, elem := range slice {
+					select {
+					case <-ctx.Done():
+						return
+					case <-complete:
+						return
+					case out <- core.Item[O]{Value: elem}:
+					}
 				}
-			}
-		}()
-		return out
-	})
+			}()
+			return out
+		},
+	)
 }
