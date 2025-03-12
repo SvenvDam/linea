@@ -14,7 +14,11 @@ import (
 
 // SQSReceiveClient defines the interface for SQS operations needed by the Source
 type SQSReceiveClient interface {
-	ReceiveMessage(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
+	ReceiveMessage(
+		ctx context.Context,
+		params *sqs.ReceiveMessageInput,
+		optFns ...func(*sqs.Options),
+	) (*sqs.ReceiveMessageOutput, error)
 }
 
 // SourceConfig holds configuration for the SQS source

@@ -25,13 +25,17 @@ func TryMap[I, O any](
 	fn func(I) (O, error),
 	opts ...core.FlowOption,
 ) *core.Flow[I, O] {
-	return core.NewFlow(func(ctx context.Context, elem I, out chan<- core.Item[O], cancel context.CancelFunc, complete core.CompleteFunc) bool {
-		result, err := fn(elem)
-		if err != nil {
-			util.Send(ctx, core.Item[O]{Err: err}, out)
-		} else {
-			util.Send(ctx, core.Item[O]{Value: result}, out)
-		}
-		return true
-	}, nil, nil, opts...)
+	return core.NewFlow(
+		func(ctx context.Context, elem I, out chan<- core.Item[O], cancel context.CancelFunc, complete core.CompleteFunc) bool {
+			result, err := fn(elem)
+			if err != nil {
+				util.Send(ctx, core.Item[O]{Err: err}, out)
+			} else {
+				util.Send(ctx, core.Item[O]{Value: result}, out)
+			}
+			return true
+		},
+		nil,
+		nil,
+		opts...)
 }

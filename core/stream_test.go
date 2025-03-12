@@ -24,24 +24,26 @@ func TestStream(t *testing.T) {
 				isSourceDone := &atomic.Bool{}
 				sourceChan := make(chan Item[int], 1)
 
-				stream := newStream(func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						defer close(sourceChan)
-						defer isSourceDone.Store(true)
+				stream := newStream(
+					func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							defer close(sourceChan)
+							defer isSourceDone.Store(true)
 
-						select {
-						case <-ctx.Done():
-							return
-						case <-complete:
-							return
-						case sourceChan <- Item[int]{Value: 42}:
-							// Value sent successfully
-						}
-					}()
-					return sourceChan
-				})
+							select {
+							case <-ctx.Done():
+								return
+							case <-complete:
+								return
+							case sourceChan <- Item[int]{Value: 42}:
+								// Value sent successfully
+							}
+						}()
+						return sourceChan
+					},
+				)
 
 				return stream, sourceChan, isSourceDone
 			},
@@ -71,21 +73,23 @@ func TestStream(t *testing.T) {
 
 				sourceStarted := make(chan struct{})
 
-				stream := newStream(func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						defer close(sourceChan)
-						defer isSourceDone.Store(true)
+				stream := newStream(
+					func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							defer close(sourceChan)
+							defer isSourceDone.Store(true)
 
-						// Signal that the source has started
-						close(sourceStarted)
+							// Signal that the source has started
+							close(sourceStarted)
 
-						// Wait for cancellation
-						<-ctx.Done()
-					}()
-					return sourceChan
-				})
+							// Wait for cancellation
+							<-ctx.Done()
+						}()
+						return sourceChan
+					},
+				)
 
 				return stream, sourceChan, isSourceDone
 			},
@@ -114,24 +118,26 @@ func TestStream(t *testing.T) {
 
 				sourceStarted := make(chan struct{})
 
-				stream := newStream(func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						defer close(sourceChan)
-						defer isSourceDone.Store(true)
+				stream := newStream(
+					func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							defer close(sourceChan)
+							defer isSourceDone.Store(true)
 
-						// Signal that the source has started
-						close(sourceStarted)
+							// Signal that the source has started
+							close(sourceStarted)
 
-						// Wait for complete signal
-						<-complete
+							// Wait for complete signal
+							<-complete
 
-						// Send a final value before closing
-						sourceChan <- Item[int]{Value: 42}
-					}()
-					return sourceChan
-				})
+							// Send a final value before closing
+							sourceChan <- Item[int]{Value: 42}
+						}()
+						return sourceChan
+					},
+				)
 
 				return stream, sourceChan, isSourceDone
 			},
@@ -159,17 +165,19 @@ func TestStream(t *testing.T) {
 				isSourceDone := &atomic.Bool{}
 				sourceChan := make(chan Item[int], 1)
 
-				stream := newStream(func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						defer close(sourceChan)
-						defer isSourceDone.Store(true)
+				stream := newStream(
+					func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							defer close(sourceChan)
+							defer isSourceDone.Store(true)
 
-						sourceChan <- Item[int]{Err: errors.New("source error")}
-					}()
-					return sourceChan
-				})
+							sourceChan <- Item[int]{Err: errors.New("source error")}
+						}()
+						return sourceChan
+					},
+				)
 
 				return stream, sourceChan, isSourceDone
 			},
@@ -197,19 +205,21 @@ func TestStream(t *testing.T) {
 				isSourceDone := &atomic.Bool{}
 				sourceChan := make(chan Item[int], 1)
 
-				stream := newStream(func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						defer close(sourceChan)
-						defer isSourceDone.Store(true)
+				stream := newStream(
+					func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							defer close(sourceChan)
+							defer isSourceDone.Store(true)
 
-						// Stay alive for a bit
-						time.Sleep(50 * time.Millisecond)
-						sourceChan <- Item[int]{Value: 42}
-					}()
-					return sourceChan
-				})
+							// Stay alive for a bit
+							time.Sleep(50 * time.Millisecond)
+							sourceChan <- Item[int]{Value: 42}
+						}()
+						return sourceChan
+					},
+				)
 
 				return stream, sourceChan, isSourceDone
 			},
@@ -238,18 +248,20 @@ func TestStream(t *testing.T) {
 				isSourceDone := &atomic.Bool{}
 				sourceChan := make(chan Item[int], 1)
 
-				stream := newStream(func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						defer close(sourceChan)
-						defer isSourceDone.Store(true)
+				stream := newStream(
+					func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							defer close(sourceChan)
+							defer isSourceDone.Store(true)
 
-						time.Sleep(50 * time.Millisecond)
-						sourceChan <- Item[int]{Value: 42}
-					}()
-					return sourceChan
-				})
+							time.Sleep(50 * time.Millisecond)
+							sourceChan <- Item[int]{Value: 42}
+						}()
+						return sourceChan
+					},
+				)
 
 				return stream, sourceChan, isSourceDone
 			},
@@ -314,9 +326,11 @@ func TestStreamIsNotRunning(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a stream but don't run it
-			stream := newStream(func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
-				return make(chan Item[int])
-			})
+			stream := newStream(
+				func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
+					return make(chan Item[int])
+				},
+			)
 
 			// Each method should return immediately without error when stream is not running
 			tt.method(stream)

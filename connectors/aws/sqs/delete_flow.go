@@ -11,7 +11,11 @@ import (
 
 // SQSDeleteClient defines the interface for SQS operations needed by the DeleteFlow
 type SQSDeleteClient interface {
-	DeleteMessage(ctx context.Context, params *sqs.DeleteMessageInput, optFns ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error)
+	DeleteMessage(
+		ctx context.Context,
+		params *sqs.DeleteMessageInput,
+		optFns ...func(*sqs.Options),
+	) (*sqs.DeleteMessageOutput, error)
 }
 
 // DeleteMessageResult represents the result of deleting a message from SQS
