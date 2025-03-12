@@ -16,9 +16,10 @@ import (
 func Slice[I any]() *core.Sink[I, []I] {
 	return core.NewSink(
 		make([]I, 0),
-		func(ctx context.Context, in I, acc []I, cancel context.CancelFunc, complete core.CompleteFunc) ([]I, bool) {
-			return append(acc, in), true
+		func(ctx context.Context, in I, acc core.Item[[]I]) (core.Item[[]I], core.StreamAction) {
+			return core.Item[[]I]{Value: append(acc.Value, in)}, core.ActionProceed
 		},
+		nil,
 		nil,
 	)
 }

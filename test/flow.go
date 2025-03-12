@@ -14,11 +14,12 @@ func AssertEachItem[I any](
 	opts ...core.FlowOption,
 ) *core.Flow[I, I] {
 	return core.NewFlow(
-		func(ctx context.Context, elem I, out chan<- core.Item[I], cancel context.CancelFunc, complete core.CompleteFunc) bool {
+		func(ctx context.Context, elem I, out chan<- core.Item[I]) core.StreamAction {
 			check(t, elem)
 			util.Send(ctx, core.Item[I]{Value: elem}, out)
-			return true
+			return core.ActionProceed
 		},
+		nil,
 		nil,
 		nil,
 		opts...,
@@ -32,11 +33,12 @@ func CheckItems[I any](
 ) *core.Flow[I, I] {
 	seen := make([]I, 0)
 	return core.NewFlow(
-		func(ctx context.Context, elem I, out chan<- core.Item[I], cancel context.CancelFunc, complete core.CompleteFunc) bool {
+		func(ctx context.Context, elem I, out chan<- core.Item[I]) core.StreamAction {
 			seen = append(seen, elem)
 			util.Send(ctx, core.Item[I]{Value: elem}, out)
-			return true
+			return core.ActionProceed
 		},
+		nil,
 		nil,
 		func(ctx context.Context, out chan<- core.Item[I]) {
 			check(t, seen)

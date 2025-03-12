@@ -22,15 +22,16 @@ func Flatten[I any](
 	opts ...core.FlowOption,
 ) *core.Flow[[]I, I] {
 	return core.NewFlow(
-		func(ctx context.Context, elem []I, out chan<- core.Item[I], cancel context.CancelFunc, complete core.CompleteFunc) bool {
+		func(ctx context.Context, elem []I, out chan<- core.Item[I]) core.StreamAction {
 			items := make([]core.Item[I], len(elem))
 			for i, item := range elem {
 				items[i] = core.Item[I]{Value: item}
 			}
 			util.SendMany(ctx, items, out)
 
-			return true
+			return core.ActionProceed
 		},
+		nil,
 		nil,
 		nil,
 		opts...)

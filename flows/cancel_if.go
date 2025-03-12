@@ -22,14 +22,14 @@ func CancelIf[I any](
 	opts ...core.FlowOption,
 ) *core.Flow[I, I] {
 	return core.NewFlow(
-		func(ctx context.Context, elem I, out chan<- core.Item[I], cancel context.CancelFunc, complete core.CompleteFunc) bool {
+		func(ctx context.Context, elem I, out chan<- core.Item[I]) core.StreamAction {
 			if pred(elem) {
-				cancel()
-				return false
+				return core.ActionCancel
 			}
 			util.Send(ctx, core.Item[I]{Value: elem}, out)
-			return true
+			return core.ActionProceed
 		},
+		nil,
 		nil,
 		nil,
 		opts...)
