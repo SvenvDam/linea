@@ -14,10 +14,11 @@ func TestSink(t *testing.T) {
 	createSink := func() *Sink[int, []int] {
 		return NewSink(
 			[]int{}, // initial empty slice
-			func(ctx context.Context, elem int, acc []int, cancel context.CancelFunc, complete CompleteFunc) ([]int, bool) {
-				return append(acc, elem), true
+			func(ctx context.Context, elem int, acc Item[[]int]) (Item[[]int], StreamAction) {
+				return Item[[]int]{Value: append(acc.Value, elem)}, ActionProceed
 			},
-			nil, // Using default error handler
+			nil,
+			nil,
 		)
 	}
 

@@ -25,14 +25,15 @@ func Batch[I any](
 ) *core.Flow[I, []I] {
 	batch := make([]I, 0, n)
 	return core.NewFlow(
-		func(ctx context.Context, elem I, out chan<- core.Item[[]I], cancel context.CancelFunc, complete core.CompleteFunc) bool {
+		func(ctx context.Context, elem I, out chan<- core.Item[[]I]) core.StreamAction {
 			batch = append(batch, elem)
 			if len(batch) == n {
 				util.Send(ctx, core.Item[[]I]{Value: batch}, out)
 				batch = make([]I, 0, n)
 			}
-			return true
+			return core.ActionProceed
 		},
+		nil,
 		nil,
 		func(ctx context.Context, out chan<- core.Item[[]I]) {
 			if len(batch) > 0 {

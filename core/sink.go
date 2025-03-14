@@ -35,26 +35,22 @@ type Sink[I, R any] struct {
 }
 
 // DefaultSinkErrorHandler is the default implementation for handling errors in a Sink.
-// It returns the error as-is and stops further processing by returning false.
-//
-// Parameters:
-//   - ctx: Context used for cancellation
-//   - err: The error that occurred
-//   - acc: The current accumulator value
-//   - cancel: Function to cancel execution
-//   - complete: Function to signal graceful shutdown
-//
-// Returns:
-//   - The original error
-//   - false to stop processing
+// It returns the value of the accumulator and the error as-is and stops further processing by returning ActionStop.
 func DefaultSinkErrorHandler[R any](
 	ctx context.Context,
 	err error,
-	acc R,
-	cancel context.CancelFunc,
-	complete CompleteFunc,
-) (error, bool) {
-	return err, false
+	acc Item[R],
+) (Item[R], StreamAction) {
+	return Item[R]{Value: acc.Value, Err: err}, ActionStop
+}
+
+// DefaultSinkUpstreamClosedHandler is the default implementation for handling upstream closed in a Sink.
+// It returns the accumulator as-is and stops further processing by returning ActionStop.
+func DefaultSinkUpstreamClosedHandler[R any](
+	ctx context.Context,
+	acc Item[R],
+) (Item[R], StreamAction) {
+	return acc, ActionStop
 }
 
 // NewSink creates a terminal component in a data processing pipeline that consumes incoming data
@@ -102,11 +98,16 @@ func DefaultSinkErrorHandler[R any](
 //   - A configured Sink ready to be connected to a stream
 func NewSink[I, R any](
 	initial R,
-	onElem func(ctx context.Context, in I, acc R, cancel context.CancelFunc, complete CompleteFunc) (R, bool),
-	onErr func(ctx context.Context, err error, acc R, cancel context.CancelFunc, complete CompleteFunc) (error, bool),
+	onElem func(ctx context.Context, in I, acc Item[R]) (Item[R], StreamAction),
+	onErr func(ctx context.Context, err error, acc Item[R]) (Item[R], StreamAction),
+	onUpstreamClosed func(ctx context.Context, acc Item[R]) (Item[R], StreamAction),
 ) *Sink[I, R] {
 	if onErr == nil {
 		onErr = DefaultSinkErrorHandler[R]
+	}
+
+	if onUpstreamClosed == nil {
+		onUpstreamClosed = DefaultSinkUpstreamClosedHandler[R]
 	}
 
 	setup := func(
@@ -135,20 +136,32 @@ func NewSink[I, R any](
 				case <-complete:
 					completeUpstream()
 				case elem, ok := <-in:
+					var action StreamAction
 					if !ok {
-						out <- acc
-						return
+						acc, action = onUpstreamClosed(ctx, acc)
+					} else if elem.Err != nil {
+						acc, action = onErr(ctx, elem.Err, acc)
+					} else {
+						acc, action = onElem(ctx, elem.Value, acc)
 					}
 
-					var proceed bool
-					if elem.Err != nil {
-						acc.Err, proceed = onErr(ctx, elem.Err, acc.Value, cancel, completeUpstream)
-					} else {
-						acc.Value, proceed = onElem(ctx, elem.Value, acc.Value, cancel, completeUpstream)
-					}
-					if !proceed {
+					switch action {
+					case ActionProceed:
+						continue
+					case ActionStop:
 						out <- acc
 						return
+					case ActionCancel:
+						cancel()
+						return
+					case ActionComplete:
+						completeUpstream()
+						continue
+					case ActionRestartUpstream:
+						completeUpstream()
+						completeUpstreamChan, completeUpstream = util.NewCompleteChannel()
+						in = setupUpstream(ctx, cancel, wg, completeUpstreamChan)
+						continue
 					}
 				}
 			}

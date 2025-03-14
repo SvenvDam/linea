@@ -29,19 +29,20 @@ func Throttle[I any](
 	remaining := n
 	ticker := time.NewTicker(interval)
 	return core.NewFlow(
-		func(ctx context.Context, elem I, out chan<- core.Item[I], cancel context.CancelFunc, complete core.CompleteFunc) bool {
+		func(ctx context.Context, elem I, out chan<- core.Item[I]) core.StreamAction {
 			for remaining <= 0 {
 				select {
 				case <-ctx.Done():
-					return false
+					return core.ActionStop
 				case <-ticker.C:
 					remaining = n
 				}
 			}
 			util.Send(ctx, core.Item[I]{Value: elem}, out)
 			remaining--
-			return true
+			return core.ActionProceed
 		},
+		nil,
 		nil,
 		func(ctx context.Context, out chan<- core.Item[I]) {
 			ticker.Stop()

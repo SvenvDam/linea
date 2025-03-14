@@ -155,15 +155,16 @@ func TestFlow(t *testing.T) {
 			}
 
 			// Create flow that converts ints to strings
-			flow := NewFlow[int, string](
+			flow := NewFlow(
 				// onElem function
-				func(ctx context.Context, elem int, out chan<- Item[string], cancel context.CancelFunc, complete CompleteFunc) bool {
+				func(ctx context.Context, elem int, out chan<- Item[string]) StreamAction {
 					if elem == -1 {
-						return false
+						return ActionStop
 					}
 					out <- Item[string]{Value: "value:" + strconv.Itoa(elem)}
-					return true
+					return ActionProceed
 				},
+				nil,
 				nil,
 				nil,
 				WithFlowBufSize(tt.bufSize),
@@ -224,10 +225,14 @@ func TestFlowOnDone(t *testing.T) {
 			}
 			onDoneCalled := false
 
-			flow := NewFlow[int, string](
-				func(ctx context.Context, elem int, out chan<- Item[string], cancel context.CancelFunc, complete CompleteFunc) bool {
-					return elem != -1
+			flow := NewFlow(
+				func(ctx context.Context, elem int, out chan<- Item[string]) StreamAction {
+					if elem == -1 {
+						return ActionStop
+					}
+					return ActionProceed
 				},
+				nil,
 				nil,
 				func(ctx context.Context, out chan<- Item[string]) {
 					onDoneCalled = true
