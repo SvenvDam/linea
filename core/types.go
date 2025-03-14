@@ -34,14 +34,15 @@ const (
 	ActionProceed StreamAction = iota
 
 	// ActionStop signals that the stream should stop processing.
+	// Any in-flight message upstream will be discarded but downstream messages will still be processed.
 	ActionStop
 
 	// ActionCancel signals that the stream should be cancelled immediately.
-	// This typically results in the cancellation of the stream's context.
+	// This will cause the stream to stop processing immediately and discard any in-flight messages.
 	ActionCancel
 
 	// ActionComplete signals that the stream should perform a graceful shutdown.
-	// This allows any in-flight operations to complete before the stream terminates.
+	// All in-flight messages in the stream will still be processed but no new messages will be accepted.
 	ActionComplete
 
 	// ActionRestartUpstream signals that the stream should restart its upstream component.
