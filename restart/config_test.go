@@ -64,7 +64,7 @@ func TestNewConfig(t *testing.T) {
 
 			assert.Equal(t, tt.expected.minBackoff, config.minBackoff)
 			assert.Equal(t, tt.expected.maxBackoff, config.maxBackoff)
-			assert.Equal(t, tt.expected.randomFactor, config.randomFactor)
+			assert.InDelta(t, tt.expected.randomFactor, config.randomFactor, 1e-9)
 
 			if tt.expected.maxRestarts == nil {
 				assert.Nil(t, config.maxRestarts)

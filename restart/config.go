@@ -91,6 +91,7 @@ func (c *Config) NextBackoff(attempts uint) (time.Duration, bool) {
 
 	// Add random jitter if RandomFactor > 0
 	if c.randomFactor > 0 {
+		//nolint:gosec // G404: using math/rand for non-security jitter is intentional
 		jitter := backoff * c.randomFactor * rand.Float64()
 		backoff += jitter
 	}
