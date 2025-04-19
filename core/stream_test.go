@@ -338,3 +338,75 @@ func TestStreamIsNotRunning(t *testing.T) {
 		})
 	}
 }
+
+// TestUnexpectedChannelClose tests the case where the channel returned by the setup function closes
+// unexpectedly, which should be handled by the Stream
+func TestUnexpectedChannelClose(t *testing.T) {
+	// Create a stream where the setup function returns a channel that closes unexpectedly
+	stream := newStream(
+		func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
+			ch := make(chan Item[int])
+
+			// Close the channel immediately without sending any values
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				close(ch)
+			}()
+
+			return ch
+		},
+	)
+
+	// Run the stream
+	ctx := context.Background()
+	result := <-stream.Run(ctx)
+
+	// Since the channel closed unexpectedly, we should get an error
+	assert.Error(t, result.Err)
+	assert.Contains(t, result.Err.Error(), "closed unexpectedly")
+
+	// Wait for all goroutines to complete
+	stream.AwaitDone()
+}
+
+// TestResultChannelCloseWithContextCancellation tests the case where the result channel closes
+// after the context is cancelled, ensuring correct error propagation
+func TestResultChannelCloseWithContextCancellation(t *testing.T) {
+	// Create a context with cancel
+	ctx, ctxCancel := context.WithCancel(context.Background())
+
+	// Create a stream where the setup function returns a channel that closes after context cancellation
+	stream := newStream(
+		func(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup, complete <-chan struct{}) <-chan Item[int] {
+			ch := make(chan Item[int])
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer close(ch)
+
+				// Wait for context cancellation then close the channel
+				<-ctx.Done()
+			}()
+
+			return ch
+		},
+	)
+
+	// Run the stream
+	result := stream.Run(ctx)
+
+	// Cancel the context
+	ctxCancel()
+
+	// Get the result
+	item := <-result
+
+	// We should get a context cancellation error
+	assert.Error(t, item.Err)
+	assert.ErrorIs(t, item.Err, context.Canceled)
+
+	// Wait for all goroutines to complete
+	stream.AwaitDone()
+}

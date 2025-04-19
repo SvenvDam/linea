@@ -65,36 +65,22 @@ func WithFlowBufSize(size int) FlowOption {
 }
 
 // DefaultFlowErrorHandler is the default implementation for handling errors in a Flow.
-// It sends the error downstream and stops the flow by returning false.
-//
-// Parameters:
-//   - ctx: Context used for cancellation
-//   - err: The error that occurred
-//   - out: Channel to send output items
-//   - cancel: Function to cancel execution
-//   - complete: Function to signal graceful shutdown
-//
-// Returns:
-//   - false to stop the flow
-func DefaultFlowErrorHandler[O any](
-	ctx context.Context,
-	err error,
-	out chan<- Item[O],
-	cancel context.CancelFunc,
-	complete CompleteFunc,
-) bool {
+// It sends the error downstream and stops the flow by returning ActionStop.
+func DefaultFlowErrorHandler[O any](ctx context.Context, err error, out chan<- Item[O]) StreamAction {
 	util.Send(ctx, Item[O]{Err: err}, out)
-	return false
+	return ActionStop
 }
 
 // DefaultFlowDoneHandler is the default implementation for cleanup when a Flow completes.
 // It performs no operations and is used when no custom cleanup is needed.
-//
-// Parameters:
-//   - ctx: Context used for cancellation
-//   - out: Channel to send any final output items
 func DefaultFlowDoneHandler[O any](ctx context.Context, out chan<- Item[O]) {
 	// No operation by default
+}
+
+// DefaultFlowUpstreamClosedHandler is the default implementation for closing a Flow.
+// It returns ActionStop to stop the flow.
+func DefaultFlowUpstreamClosedHandler[O any](ctx context.Context, out chan<- Item[O]) StreamAction {
+	return ActionStop
 }
 
 // NewFlow creates a new Flow that transforms input items to output items using
@@ -140,8 +126,9 @@ func DefaultFlowDoneHandler[O any](ctx context.Context, out chan<- Item[O]) {
 // Returns:
 //   - A new Flow instance that will perform the specified transformation
 func NewFlow[I, O any](
-	onElem func(ctx context.Context, elem I, out chan<- Item[O], cancel context.CancelFunc, complete CompleteFunc) bool,
-	onErr func(ctx context.Context, err error, out chan<- Item[O], cancel context.CancelFunc, complete CompleteFunc) bool,
+	onElem func(ctx context.Context, elem I, out chan<- Item[O]) StreamAction,
+	onErr func(ctx context.Context, err error, out chan<- Item[O]) StreamAction,
+	onUpstreamClosed func(ctx context.Context, out chan<- Item[O]) StreamAction,
 	onDone func(ctx context.Context, out chan<- Item[O]),
 	opts ...FlowOption,
 ) *Flow[I, O] {
@@ -149,6 +136,10 @@ func NewFlow[I, O any](
 
 	if onErr == nil {
 		onErr = DefaultFlowErrorHandler[O]
+	}
+
+	if onUpstreamClosed == nil {
+		onUpstreamClosed = DefaultFlowUpstreamClosedHandler[O]
 	}
 
 	if onDone == nil {
@@ -185,18 +176,31 @@ func NewFlow[I, O any](
 				case <-complete:
 					completeUpstream()
 				case elem, ok := <-in:
+					var action StreamAction
 					if !ok {
-						return
+						action = onUpstreamClosed(ctx, out)
+					} else if elem.Err != nil {
+						action = onErr(ctx, elem.Err, out)
+					} else {
+						action = onElem(ctx, elem.Value, out)
 					}
 
-					var proceed bool
-					if elem.Err != nil {
-						proceed = onErr(ctx, elem.Err, out, cancel, completeUpstream)
-					} else {
-						proceed = onElem(ctx, elem.Value, out, cancel, completeUpstream)
-					}
-					if !proceed {
+					switch action {
+					case ActionProceed:
+						continue
+					case ActionStop:
 						return
+					case ActionCancel:
+						cancel()
+						return
+					case ActionComplete:
+						completeUpstream()
+						continue
+					case ActionRestartUpstream:
+						completeUpstream()
+						completeUpstreamChan, completeUpstream = util.NewCompleteChannel()
+						in = setupUpstream(ctx, cancel, wg, completeUpstreamChan)
+						continue
 					}
 				}
 			}

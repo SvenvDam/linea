@@ -13,20 +13,22 @@ import (
 func TestConnectFlows(t *testing.T) {
 	// Create two simple flows: int -> string -> int
 	flow1 := NewFlow(
-		func(ctx context.Context, elem int, out chan<- Item[string], cancel context.CancelFunc, complete CompleteFunc) bool {
+		func(ctx context.Context, elem int, out chan<- Item[string]) StreamAction {
 			out <- Item[string]{Value: strconv.Itoa(elem)}
-			return true
+			return ActionProceed
 		},
+		nil,
 		nil,
 		nil,
 	)
 
 	flow2 := NewFlow(
-		func(ctx context.Context, elem string, out chan<- Item[int], cancel context.CancelFunc, complete CompleteFunc) bool {
+		func(ctx context.Context, elem string, out chan<- Item[int]) StreamAction {
 			val, _ := strconv.Atoi(elem)
 			out <- Item[int]{Value: val * 2}
-			return true
+			return ActionProceed
 		},
+		nil,
 		nil,
 		nil,
 	)
@@ -78,10 +80,11 @@ func TestAppendFlowToSource(t *testing.T) {
 
 	// Create a flow that doubles the number
 	flow := NewFlow(
-		func(ctx context.Context, elem int, out chan<- Item[int], cancel context.CancelFunc, complete CompleteFunc) bool {
+		func(ctx context.Context, elem int, out chan<- Item[int]) StreamAction {
 			out <- Item[int]{Value: elem * 2}
-			return true
+			return ActionProceed
 		},
+		nil,
 		nil,
 		nil,
 	)
@@ -109,10 +112,11 @@ func TestAppendFlowToSource(t *testing.T) {
 func TestPrependFlowToSink(t *testing.T) {
 	// Create a flow that converts int to string
 	flow := NewFlow(
-		func(ctx context.Context, elem int, out chan<- Item[string], cancel context.CancelFunc, complete CompleteFunc) bool {
+		func(ctx context.Context, elem int, out chan<- Item[string]) StreamAction {
 			out <- Item[string]{Value: strconv.Itoa(elem)}
-			return true
+			return ActionProceed
 		},
+		nil,
 		nil,
 		nil,
 	)
@@ -120,9 +124,10 @@ func TestPrependFlowToSink(t *testing.T) {
 	// Create a sink that concatenates strings
 	sink := NewSink(
 		"",
-		func(ctx context.Context, elem string, acc string, cancel context.CancelFunc, complete CompleteFunc) (string, bool) {
-			return acc + elem, true
+		func(ctx context.Context, elem string, acc Item[string]) (Item[string], StreamAction) {
+			return Item[string]{Value: acc.Value + elem}, ActionProceed
 		},
+		nil,
 		nil,
 	)
 
@@ -172,9 +177,10 @@ func TestConnectSourceToSink(t *testing.T) {
 	// Create a sink that converts to string
 	sink := NewSink(
 		"",
-		func(ctx context.Context, elem int, acc string, cancel context.CancelFunc, complete CompleteFunc) (string, bool) {
-			return acc + strconv.Itoa(elem), true
+		func(ctx context.Context, elem int, acc Item[string]) (Item[string], StreamAction) {
+			return Item[string]{Value: acc.Value + strconv.Itoa(elem)}, ActionProceed
 		},
+		nil,
 		nil,
 	)
 

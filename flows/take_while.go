@@ -23,13 +23,14 @@ func TakeWhile[I any](
 	opts ...core.FlowOption,
 ) *core.Flow[I, I] {
 	return core.NewFlow(
-		func(ctx context.Context, elem I, out chan<- core.Item[I], cancel context.CancelFunc, complete core.CompleteFunc) bool {
+		func(ctx context.Context, elem I, out chan<- core.Item[I]) core.StreamAction {
 			if !pred(elem) {
-				return false
+				return core.ActionStop
 			}
 			util.Send(ctx, core.Item[I]{Value: elem}, out)
-			return true
+			return core.ActionProceed
 		},
+		nil,
 		nil,
 		nil,
 		opts...)

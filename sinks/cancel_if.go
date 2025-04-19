@@ -22,13 +22,13 @@ func CancelIf[I any](
 ) *core.Sink[I, struct{}] {
 	return core.NewSink(
 		struct{}{},
-		func(ctx context.Context, in I, acc struct{}, cancel context.CancelFunc, complete core.CompleteFunc) (struct{}, bool) {
+		func(ctx context.Context, in I, acc core.Item[struct{}]) (core.Item[struct{}], core.StreamAction) {
 			if pred(in) {
-				cancel()
-				return acc, false
+				return acc, core.ActionCancel
 			}
-			return acc, true
+			return acc, core.ActionProceed
 		},
+		nil,
 		nil,
 	)
 }

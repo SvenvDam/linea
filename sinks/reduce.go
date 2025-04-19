@@ -25,9 +25,10 @@ func Reduce[I, R any](
 ) *core.Sink[I, R] {
 	return core.NewSink(
 		initial,
-		func(ctx context.Context, in I, acc R, cancel context.CancelFunc, complete core.CompleteFunc) (R, bool) {
-			return fn(acc, in), true
+		func(ctx context.Context, in I, acc core.Item[R]) (core.Item[R], core.StreamAction) {
+			return core.Item[R]{Value: fn(acc.Value, in)}, core.ActionProceed
 		},
+		nil,
 		nil,
 	)
 }
