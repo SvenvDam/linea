@@ -1,4 +1,4 @@
-package restart
+package retry
 
 import (
 	"math"
@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Config defines how a stream should restart on failure.
+// Config defines how a stream should retry on failure.
 // It provides exponential backoff with optional jitter and configurable retry limits.
 type Config struct {
 	// minBackoff is the minimum (initial) duration until the stream will be restarted after failure
@@ -20,20 +20,20 @@ type Config struct {
 	// Set to 0 to disable random factor
 	randomFactor float64
 
-	// maxRestarts is the maximum number of restarts allowed
-	// A value of nil means unlimited restarts
-	maxRestarts *uint
+	// maxRetries is the maximum number of retries allowed
+	// A value of nil means unlimited retries
+	maxRetries *uint
 }
 
 // Option is a function that configures a Config
 type Option func(*Config)
 
-// WithMaxRestarts sets the maximum number of restart attempts.
+// WithMaxRetries sets the maximum number of retry attempts.
 // Once this limit is reached, NextBackoff will return (0, false).
-// This is useful for preventing infinite restart loops in case of persistent failures.
-func WithMaxRestarts(n uint) Option {
+// This is useful for preventing infinite retry loops in case of persistent failures.
+func WithMaxRetries(n uint) Option {
 	return func(c *Config) {
-		c.maxRestarts = &n
+		c.maxRetries = &n
 	}
 }
 
@@ -43,19 +43,19 @@ func WithMaxRestarts(n uint) Option {
 //   - minBackoff: The initial backoff duration after the first failure
 //   - maxBackoff: The maximum backoff duration that will not be exceeded
 //   - randomFactor: A factor between 0.0 and 1.0 to add randomness to backoff duration
-//   - opts: Optional configuration options like WithMaxRestarts
+//   - opts: Optional configuration options like WithMaxRetries
 //
 // Example:
 //
-//	// Config with 1s initial backoff, 1m max backoff, 20% jitter, and max 5 restarts
-//	config := NewConfig(time.Second, time.Minute, 0.2, WithMaxRestarts(5))
+//	// Config with 1s initial backoff, 1m max backoff, 20% jitter, and max 5 retries
+//	config := NewConfig(time.Second, time.Minute, 0.2, WithMaxRetries(5))
 func NewConfig(minBackoff time.Duration, maxBackoff time.Duration, randomFactor float64, opts ...Option) *Config {
 	// Set default values
 	c := &Config{
 		minBackoff:   minBackoff,
 		maxBackoff:   maxBackoff,
 		randomFactor: randomFactor,
-		maxRestarts:  nil,
+		maxRetries:   nil,
 	}
 
 	// Apply all options
@@ -73,13 +73,13 @@ func NewConfig(minBackoff time.Duration, maxBackoff time.Duration, randomFactor 
 // where jitter is a random value between 0 and (backoff * randomFactor).
 //
 // Parameters:
-//   - attempts: The number of restart attempts that have already occurred (0-based)
+//   - attempts: The number of retry attempts that have already occurred (0-based)
 //
 // Returns:
 //   - time.Duration: The calculated backoff duration
-//   - bool: false if max restarts has been reached, true otherwise
+//   - bool: false if max retries has been reached, true otherwise
 func (c *Config) NextBackoff(attempts uint) (time.Duration, bool) {
-	if c.maxRestarts != nil && attempts >= *c.maxRestarts {
+	if c.maxRetries != nil && attempts >= *c.maxRetries {
 		return 0, false
 	}
 
