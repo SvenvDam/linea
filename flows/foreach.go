@@ -20,12 +20,12 @@ import (
 //
 // Returns a Flow that applies the side-effect to each item
 func ForEach[I any](
-	fn func(I),
+	fn func(context.Context, I),
 	opts ...core.FlowOption,
 ) *core.Flow[I, I] {
 	return core.NewFlow(
 		func(ctx context.Context, elem I, out chan<- core.Item[I]) core.StreamAction {
-			fn(elem)
+			fn(ctx, elem)
 			util.Send(ctx, core.Item[I]{Value: elem}, out)
 			return core.ActionProceed
 		},

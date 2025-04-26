@@ -12,6 +12,12 @@ The SQS package currently provides:
 - **SendFlow**: Send messages to SQS queue while preserving the original input for downstream processing
 - **DeleteFlow**: Delete messages from SQS queue by extracting receipt handles from inputs
 
+### Amazon EventBridge
+
+The EventBridge package currently provides:
+
+- **SendFlow**: Publish events to EventBridge while preserving the original input for downstream processing
+
 Additional functionality (sinks and flows) will be added in future updates.
 
 ## Getting Started

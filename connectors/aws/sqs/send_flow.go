@@ -58,7 +58,7 @@ func SendFlow[I any](
 	messageBuilder func(I) *sqs.SendMessageInput,
 	opts ...core.FlowOption,
 ) *core.Flow[I, SendMessageResult[I]] {
-	return flows.TryMap(func(elem I) (SendMessageResult[I], error) {
+	return flows.TryMap(func(ctx context.Context, elem I) (SendMessageResult[I], error) {
 		// Build the message input from the input element
 		msgInput := messageBuilder(elem)
 
@@ -72,8 +72,8 @@ func SendFlow[I any](
 			msgInput.DelaySeconds = config.DelaySeconds
 		}
 
-		// Send the message to SQS
-		output, err := client.SendMessage(context.Background(), msgInput)
+		// Send the message to SQS using the provided context
+		output, err := client.SendMessage(ctx, msgInput)
 		if err != nil {
 			return SendMessageResult[I]{}, err
 		}

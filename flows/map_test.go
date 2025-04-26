@@ -16,26 +16,32 @@ func TestMap(t *testing.T) {
 	tests := []struct {
 		name   string
 		input  []int
-		mapper func(int) string
+		mapper func(context.Context, int) string
 		want   []string
 	}{
 		{
-			name:   "maps integers to strings",
-			input:  []int{1, 2, 3},
-			mapper: strconv.Itoa,
-			want:   []string{"1", "2", "3"},
+			name:  "maps integers to strings",
+			input: []int{1, 2, 3},
+			mapper: func(ctx context.Context, i int) string {
+				return strconv.Itoa(i)
+			},
+			want: []string{"1", "2", "3"},
 		},
 		{
-			name:   "handles empty input",
-			input:  []int{},
-			mapper: strconv.Itoa,
-			want:   []string{},
+			name:  "handles empty input",
+			input: []int{},
+			mapper: func(ctx context.Context, i int) string {
+				return strconv.Itoa(i)
+			},
+			want: []string{},
 		},
 		{
-			name:   "propagates errors",
-			input:  []int{1, 2, 3},
-			mapper: strconv.Itoa,
-			want:   []string{"1", "2", "3"},
+			name:  "propagates errors",
+			input: []int{1, 2, 3},
+			mapper: func(ctx context.Context, i int) string {
+				return strconv.Itoa(i)
+			},
+			want: []string{"1", "2", "3"},
 		},
 	}
 

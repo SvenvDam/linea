@@ -17,15 +17,15 @@ func TestForEach(t *testing.T) {
 		name   string
 		input  []int
 		want   []int
-		effect func() (func(int), *sync.Map)
+		effect func() (func(context.Context, int), *sync.Map)
 	}{
 		{
 			name:  "applies side effect and passes through",
 			input: []int{1, 2, 3},
 			want:  []int{1, 2, 3},
-			effect: func() (func(int), *sync.Map) {
+			effect: func() (func(context.Context, int), *sync.Map) {
 				seen := &sync.Map{}
-				return func(i int) {
+				return func(ctx context.Context, i int) {
 					seen.Store(i, true)
 				}, seen
 			},
@@ -34,8 +34,8 @@ func TestForEach(t *testing.T) {
 			name:  "handles empty input",
 			input: []int{},
 			want:  []int{},
-			effect: func() (func(int), *sync.Map) {
-				return func(i int) {
+			effect: func() (func(context.Context, int), *sync.Map) {
+				return func(ctx context.Context, i int) {
 					t.Error("should not apply effect to any items")
 				}, nil
 			},
@@ -62,10 +62,13 @@ func TestForEach(t *testing.T) {
 
 			res := <-stream.Run(ctx)
 			assert.NoError(t, res.Err)
-			for _, item := range tt.input {
-				val, ok := seen.Load(item)
-				assert.True(t, ok)
-				assert.True(t, val.(bool))
+
+			if seen != nil {
+				for _, item := range tt.input {
+					val, ok := seen.Load(item)
+					assert.True(t, ok)
+					assert.True(t, val.(bool))
+				}
 			}
 		})
 	}

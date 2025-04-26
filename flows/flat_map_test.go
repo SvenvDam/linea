@@ -15,14 +15,14 @@ func TestFlatMap(t *testing.T) {
 	tests := []struct {
 		name   string
 		input  []int
-		mapper func(int) []string
+		mapper func(context.Context, int) []string
 		want   []string
 		check  func(t *testing.T, item string)
 	}{
 		{
 			name:  "maps single item to multiple items",
 			input: []int{1, 2},
-			mapper: func(i int) []string {
+			mapper: func(ctx context.Context, i int) []string {
 				return []string{
 					string(rune('a' + i - 1)),
 					string(rune('A' + i - 1)),
@@ -36,7 +36,7 @@ func TestFlatMap(t *testing.T) {
 		{
 			name:  "handles empty input",
 			input: []int{},
-			mapper: func(i int) []string {
+			mapper: func(ctx context.Context, i int) []string {
 				return []string{string(rune('a' + i - 1))}
 			},
 			want: []string{},
@@ -47,7 +47,7 @@ func TestFlatMap(t *testing.T) {
 		{
 			name:  "handles mapper returning empty slice",
 			input: []int{1, 2},
-			mapper: func(i int) []string {
+			mapper: func(ctx context.Context, i int) []string {
 				return []string{}
 			},
 			want: []string{},

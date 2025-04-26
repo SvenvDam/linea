@@ -22,12 +22,12 @@ import (
 //
 // Returns a Flow that transforms items using the mapping function and handles errors
 func TryMap[I, O any](
-	fn func(I) (O, error),
+	fn func(context.Context, I) (O, error),
 	opts ...core.FlowOption,
 ) *core.Flow[I, O] {
 	return core.NewFlow(
 		func(ctx context.Context, elem I, out chan<- core.Item[O]) core.StreamAction {
-			result, err := fn(elem)
+			result, err := fn(ctx, elem)
 			if err != nil {
 				util.Send(ctx, core.Item[O]{Err: err}, out)
 			} else {

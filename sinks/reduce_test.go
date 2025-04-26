@@ -15,7 +15,7 @@ func TestReduce(t *testing.T) {
 		setup    func(context.Context) context.Context
 		elements []int
 		initial  int
-		reducer  func(int, int) int
+		reducer  func(context.Context, int, int) int
 		want     int
 	}{
 		{
@@ -23,7 +23,7 @@ func TestReduce(t *testing.T) {
 			setup:    func(ctx context.Context) context.Context { return ctx },
 			elements: []int{1, 2, 3, 4, 5},
 			initial:  0,
-			reducer: func(acc, elem int) int {
+			reducer: func(ctx context.Context, acc, elem int) int {
 				return acc + elem
 			},
 			want: 15,
@@ -33,7 +33,7 @@ func TestReduce(t *testing.T) {
 			setup:    func(ctx context.Context) context.Context { return ctx },
 			elements: []int{},
 			initial:  42,
-			reducer: func(acc, elem int) int {
+			reducer: func(ctx context.Context, acc, elem int) int {
 				return acc + elem
 			},
 			want: 42,

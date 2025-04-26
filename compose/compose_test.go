@@ -22,7 +22,7 @@ func TestComposeVariants(t *testing.T) {
 			setup: func() *core.Stream[[]int] {
 				source := SourceThroughFlow(
 					sources.Slice([]int{1}),
-					flows.Map(func(i int) int { return i * 2 }),
+					flows.Map(func(_ context.Context, i int) int { return i * 2 }),
 				)
 				return SourceToSink(source, sinks.Slice[int]())
 			},
@@ -33,8 +33,8 @@ func TestComposeVariants(t *testing.T) {
 			setup: func() *core.Stream[[]int] {
 				source := SourceThroughFlow2(
 					sources.Slice([]int{1}),
-					flows.Map(func(i int) int { return i * 2 }),
-					flows.Map(func(i int) int { return i + 1 }),
+					flows.Map(func(_ context.Context, i int) int { return i * 2 }),
+					flows.Map(func(_ context.Context, i int) int { return i + 1 }),
 				)
 				return SourceToSink(source, sinks.Slice[int]())
 			},
@@ -45,9 +45,9 @@ func TestComposeVariants(t *testing.T) {
 			setup: func() *core.Stream[[]int] {
 				source := SourceThroughFlow3(
 					sources.Slice([]int{1}),
-					flows.Map(func(i int) int { return i * 2 }),
-					flows.Map(func(i int) int { return i + 1 }),
-					flows.Map(func(i int) int { return i * 2 }),
+					flows.Map(func(_ context.Context, i int) int { return i * 2 }),
+					flows.Map(func(_ context.Context, i int) int { return i + 1 }),
+					flows.Map(func(_ context.Context, i int) int { return i * 2 }),
 				)
 				return SourceToSink(source, sinks.Slice[int]())
 			},
@@ -58,7 +58,7 @@ func TestComposeVariants(t *testing.T) {
 			setup: func() *core.Stream[[]int] {
 				return SourceThroughFlowToSink(
 					sources.Slice([]int{1}),
-					flows.Map(func(i int) int { return i * 2 }),
+					flows.Map(func(_ context.Context, i int) int { return i * 2 }),
 					sinks.Slice[int](),
 				)
 			},
@@ -69,8 +69,8 @@ func TestComposeVariants(t *testing.T) {
 			setup: func() *core.Stream[[]int] {
 				return SourceThroughFlowToSink2(
 					sources.Slice([]int{1}),
-					flows.Map(func(i int) int { return i * 2 }),
-					flows.Map(func(i int) int { return i + 1 }),
+					flows.Map(func(_ context.Context, i int) int { return i * 2 }),
+					flows.Map(func(_ context.Context, i int) int { return i + 1 }),
 					sinks.Slice[int](),
 				)
 			},
@@ -81,9 +81,9 @@ func TestComposeVariants(t *testing.T) {
 			setup: func() *core.Stream[[]int] {
 				return SourceThroughFlowToSink3(
 					sources.Slice([]int{1}),
-					flows.Map(func(i int) int { return i * 2 }),
-					flows.Map(func(i int) int { return i + 1 }),
-					flows.Map(func(i int) int { return i * 2 }),
+					flows.Map(func(_ context.Context, i int) int { return i * 2 }),
+					flows.Map(func(_ context.Context, i int) int { return i + 1 }),
+					flows.Map(func(_ context.Context, i int) int { return i * 2 }),
 					sinks.Slice[int](),
 				)
 			},
@@ -95,7 +95,7 @@ func TestComposeVariants(t *testing.T) {
 				return SourceToSink(
 					sources.Slice([]int{1}),
 					SinkThroughFlow(
-						flows.Map(func(i int) int { return i * 2 }),
+						flows.Map(func(_ context.Context, i int) int { return i * 2 }),
 						sinks.Slice[int](),
 					),
 				)
@@ -108,8 +108,8 @@ func TestComposeVariants(t *testing.T) {
 				return SourceToSink(
 					sources.Slice([]int{1}),
 					SinkThroughFlow2(
-						flows.Map(func(i int) int { return i * 2 }),
-						flows.Map(func(i int) int { return i + 1 }),
+						flows.Map(func(_ context.Context, i int) int { return i * 2 }),
+						flows.Map(func(_ context.Context, i int) int { return i + 1 }),
 						sinks.Slice[int](),
 					),
 				)
@@ -122,9 +122,9 @@ func TestComposeVariants(t *testing.T) {
 				return SourceToSink(
 					sources.Slice([]int{1}),
 					SinkThroughFlow3(
-						flows.Map(func(i int) int { return i * 2 }),
-						flows.Map(func(i int) int { return i + 1 }),
-						flows.Map(func(i int) int { return i * 2 }),
+						flows.Map(func(_ context.Context, i int) int { return i * 2 }),
+						flows.Map(func(_ context.Context, i int) int { return i + 1 }),
+						flows.Map(func(_ context.Context, i int) int { return i * 2 }),
 						sinks.Slice[int](),
 					),
 				)
@@ -137,8 +137,8 @@ func TestComposeVariants(t *testing.T) {
 				return SourceThroughFlowToSink(
 					sources.Slice([]int{1}),
 					MergeFlows(
-						flows.Map(func(i int) int { return i * 2 }),
-						flows.Map(func(i int) int { return i + 1 }),
+						flows.Map(func(_ context.Context, i int) int { return i * 2 }),
+						flows.Map(func(_ context.Context, i int) int { return i + 1 }),
 					),
 					sinks.Slice[int](),
 				)
@@ -151,9 +151,9 @@ func TestComposeVariants(t *testing.T) {
 				return SourceThroughFlowToSink(
 					sources.Slice([]int{1}),
 					MergeFlows3(
-						flows.Map(func(i int) int { return i * 2 }),
-						flows.Map(func(i int) int { return i + 1 }),
-						flows.Map(func(i int) int { return i * 2 }),
+						flows.Map(func(_ context.Context, i int) int { return i * 2 }),
+						flows.Map(func(_ context.Context, i int) int { return i + 1 }),
+						flows.Map(func(_ context.Context, i int) int { return i * 2 }),
 					),
 					sinks.Slice[int](),
 				)

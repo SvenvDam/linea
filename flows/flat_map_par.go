@@ -23,7 +23,7 @@ import (
 //
 // Returns a Flow that transforms items in parallel
 func FlatMapPar[I, O any](
-	fn func(I) []O,
+	fn func(context.Context, I) []O,
 	parallelism int,
 	opts ...core.FlowOption,
 ) *core.Flow[I, O] {
@@ -38,7 +38,7 @@ func FlatMapPar[I, O any](
 					wg.Done()
 					<-sem // release the slot
 				}()
-				res := fn(elem)
+				res := fn(ctx, elem)
 				items := make([]core.Item[O], len(res))
 				for i, item := range res {
 					items[i] = core.Item[O]{Value: item}

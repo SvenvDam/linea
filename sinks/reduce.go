@@ -21,12 +21,12 @@ import (
 // Returns a Sink that reduces items to a single result
 func Reduce[I, R any](
 	initial R,
-	fn func(R, I) R,
+	fn func(context.Context, R, I) R,
 ) *core.Sink[I, R] {
 	return core.NewSink(
 		initial,
 		func(ctx context.Context, in I, acc core.Item[R]) (core.Item[R], core.StreamAction) {
-			return core.Item[R]{Value: fn(acc.Value, in)}, core.ActionProceed
+			return core.Item[R]{Value: fn(ctx, acc.Value, in)}, core.ActionProceed
 		},
 		nil,
 		nil,

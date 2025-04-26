@@ -23,7 +23,7 @@ import (
 //
 // Returns a Flow that transforms items in parallel
 func MapPar[I, O any](
-	fn func(I) O,
+	fn func(context.Context, I) O,
 	parallelism int,
 	opts ...core.FlowOption,
 ) *core.Flow[I, O] {
@@ -38,7 +38,7 @@ func MapPar[I, O any](
 					wg.Done()
 					<-sem // release the slot
 				}()
-				util.Send(ctx, core.Item[O]{Value: fn(elem)}, out)
+				util.Send(ctx, core.Item[O]{Value: fn(ctx, elem)}, out)
 			}()
 			return core.ActionProceed
 		},

@@ -18,16 +18,16 @@ func TestFlatMapPar(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       []int
-		setup       func() func(int) []string
+		setup       func() func(context.Context, int) []string
 		parallelism int
 		want        []string
 	}{
 		{
 			name:  "flattens and transforms items in parallel",
 			input: []int{1, 2, 3, 4},
-			setup: func() func(i int) []string {
+			setup: func() func(ctx context.Context, i int) []string {
 				parTracker := test.NewParallelTracker()
-				mapper := func(i int) []string {
+				mapper := func(ctx context.Context, i int) []string {
 					parallelism, cleanup := parTracker.Track()
 					defer cleanup()
 
@@ -55,9 +55,9 @@ func TestFlatMapPar(t *testing.T) {
 		{
 			name:  "handles empty input",
 			input: []int{},
-			setup: func() func(i int) []string {
+			setup: func() func(ctx context.Context, i int) []string {
 				parTracker := test.NewParallelTracker()
-				mapper := func(i int) []string {
+				mapper := func(ctx context.Context, i int) []string {
 					parallelism, cleanup := parTracker.Track()
 					assert.LessOrEqual(t, parallelism, maxParallelism)
 					defer cleanup()
@@ -72,9 +72,9 @@ func TestFlatMapPar(t *testing.T) {
 		{
 			name:  "handles mapper returning empty slices",
 			input: []int{1, 2, 3},
-			setup: func() func(i int) []string {
+			setup: func() func(ctx context.Context, i int) []string {
 				parTracker := test.NewParallelTracker()
-				mapper := func(i int) []string {
+				mapper := func(ctx context.Context, i int) []string {
 					parallelism, cleanup := parTracker.Track()
 					defer cleanup()
 
@@ -94,9 +94,9 @@ func TestFlatMapPar(t *testing.T) {
 		{
 			name:  "handles nil slices from mapper",
 			input: []int{1, 2},
-			setup: func() func(i int) []string {
+			setup: func() func(ctx context.Context, i int) []string {
 				parTracker := test.NewParallelTracker()
-				mapper := func(i int) []string {
+				mapper := func(ctx context.Context, i int) []string {
 					parallelism, cleanup := parTracker.Track()
 					defer cleanup()
 
