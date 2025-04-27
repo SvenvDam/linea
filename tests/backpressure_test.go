@@ -35,14 +35,14 @@ func TestBackpressure(t *testing.T) {
 			ctx := context.Background()
 			seenTimes := make([]time.Time, 0)
 
-			timeLogFlow := flows.ForEach(func(elem int) {
+			timeLogFlow := flows.ForEach(func(_ context.Context, elem int) {
 				seenTimes = append(seenTimes, time.Now())
 			}, core.WithFlowBufSize(tt.bufSize))
 
 			stream := compose.SourceThroughFlowToSink(
 				sources.Repeat(1), // fast source
 				timeLogFlow,
-				sinks.ForEach(func(elem int) { // slow sink
+				sinks.ForEach(func(_ context.Context, elem int) { // slow sink
 					time.Sleep(waitDuration)
 				}),
 			)

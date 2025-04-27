@@ -54,7 +54,7 @@ func DeleteFlow[I any](
 	receiptHandleExtractor func(I) *string,
 	opts ...core.FlowOption,
 ) *core.Flow[I, DeleteMessageResult[I]] {
-	return flows.TryMap(func(elem I) (DeleteMessageResult[I], error) {
+	return flows.TryMap(func(ctx context.Context, elem I) (DeleteMessageResult[I], error) {
 		// Extract the receipt handle from the input element
 		receiptHandle := receiptHandleExtractor(elem)
 
@@ -69,8 +69,8 @@ func DeleteFlow[I any](
 			ReceiptHandle: receiptHandle,
 		}
 
-		// Delete the message from SQS
-		output, err := client.DeleteMessage(context.Background(), deleteInput)
+		// Delete the message from SQS using the provided context
+		output, err := client.DeleteMessage(ctx, deleteInput)
 		if err != nil {
 			return DeleteMessageResult[I]{}, err
 		}

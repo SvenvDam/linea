@@ -21,12 +21,12 @@ import (
 //
 // Returns a Flow that transforms items using the mapping function
 func FlatMap[I, O any](
-	fn func(I) []O,
+	fn func(context.Context, I) []O,
 	opts ...core.FlowOption,
 ) *core.Flow[I, O] {
 	return core.NewFlow(
 		func(ctx context.Context, elem I, out chan<- core.Item[O]) core.StreamAction {
-			res := fn(elem)
+			res := fn(ctx, elem)
 			items := make([]core.Item[O], len(res))
 			for i, item := range res {
 				items[i] = core.Item[O]{Value: item}

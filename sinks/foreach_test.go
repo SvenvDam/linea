@@ -15,15 +15,15 @@ func TestForEach(t *testing.T) {
 		name     string
 		setup    func(context.Context) context.Context
 		elements []int
-		effect   func() (func(int), *sync.Map)
+		effect   func() (func(context.Context, int), *sync.Map)
 	}{
 		{
 			name:     "applies effect to all elements",
 			setup:    func(ctx context.Context) context.Context { return ctx },
 			elements: []int{1, 2, 3},
-			effect: func() (func(int), *sync.Map) {
+			effect: func() (func(context.Context, int), *sync.Map) {
 				seen := &sync.Map{}
-				return func(i int) {
+				return func(ctx context.Context, i int) {
 					seen.Store(i, true)
 				}, seen
 			},

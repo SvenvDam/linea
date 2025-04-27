@@ -15,31 +15,31 @@ func TestFilter(t *testing.T) {
 	tests := []struct {
 		name  string
 		input []int
-		pred  func(int) bool
+		pred  func(context.Context, int) bool
 		want  []int
 	}{
 		{
 			name:  "filters even numbers",
 			input: []int{1, 2, 3, 4, 5, 6},
-			pred:  func(i int) bool { return i%2 == 0 },
+			pred:  func(ctx context.Context, i int) bool { return i%2 == 0 },
 			want:  []int{2, 4, 6},
 		},
 		{
 			name:  "filters nothing when predicate always true",
 			input: []int{1, 2, 3},
-			pred:  func(i int) bool { return true },
+			pred:  func(ctx context.Context, i int) bool { return true },
 			want:  []int{1, 2, 3},
 		},
 		{
 			name:  "filters everything when predicate always false",
 			input: []int{1, 2, 3},
-			pred:  func(i int) bool { return false },
+			pred:  func(ctx context.Context, i int) bool { return false },
 			want:  []int{},
 		},
 		{
 			name:  "handles empty input",
 			input: []int{},
-			pred:  func(i int) bool { return true },
+			pred:  func(ctx context.Context, i int) bool { return true },
 			want:  []int{},
 		},
 	}

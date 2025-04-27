@@ -1,4 +1,4 @@
-package restart
+package retry
 
 import (
 	"testing"
@@ -27,33 +27,33 @@ func TestNewConfig(t *testing.T) {
 				minBackoff:   time.Second,
 				maxBackoff:   time.Minute,
 				randomFactor: 0.2,
-				maxRestarts:  nil,
+				maxRetries:   nil,
 			},
 		},
 		{
-			name:         "with_max_restarts",
+			name:         "with_max_retries",
 			minBackoff:   500 * time.Millisecond,
 			maxBackoff:   30 * time.Second,
 			randomFactor: 0.1,
-			opts:         []Option{WithMaxRestarts(3)},
+			opts:         []Option{WithMaxRetries(3)},
 			expected: Config{
 				minBackoff:   500 * time.Millisecond,
 				maxBackoff:   30 * time.Second,
 				randomFactor: 0.1,
-				maxRestarts:  ptrUint(3),
+				maxRetries:   ptrUint(3),
 			},
 		},
 		{
-			name:         "zero_max_restarts",
+			name:         "zero_max_retries",
 			minBackoff:   time.Second,
 			maxBackoff:   time.Minute,
 			randomFactor: 0,
-			opts:         []Option{WithMaxRestarts(0)},
+			opts:         []Option{WithMaxRetries(0)},
 			expected: Config{
 				minBackoff:   time.Second,
 				maxBackoff:   time.Minute,
 				randomFactor: 0,
-				maxRestarts:  ptrUint(0),
+				maxRetries:   ptrUint(0),
 			},
 		},
 	}
@@ -66,11 +66,11 @@ func TestNewConfig(t *testing.T) {
 			assert.Equal(t, tt.expected.maxBackoff, config.maxBackoff)
 			assert.InDelta(t, tt.expected.randomFactor, config.randomFactor, 1e-9)
 
-			if tt.expected.maxRestarts == nil {
-				assert.Nil(t, config.maxRestarts)
+			if tt.expected.maxRetries == nil {
+				assert.Nil(t, config.maxRetries)
 			} else {
-				assert.NotNil(t, config.maxRestarts)
-				assert.Equal(t, *tt.expected.maxRestarts, *config.maxRestarts)
+				assert.NotNil(t, config.maxRetries)
+				assert.Equal(t, *tt.expected.maxRetries, *config.maxRetries)
 			}
 		})
 	}
@@ -118,15 +118,15 @@ func TestConfig_NextBackoff(t *testing.T) {
 			expectOk:    true,
 		},
 		{
-			name:        "limited_restarts",
-			config:      NewConfig(time.Second, time.Minute, 0, WithMaxRestarts(5)),
-			attempts:    5, // Equal to max restarts
+			name:        "limited_retries",
+			config:      NewConfig(time.Second, time.Minute, 0, WithMaxRetries(5)),
+			attempts:    5, // Equal to max retries
 			minExpected: 0,
 			maxExpected: 0,
 			expectOk:    false,
 		},
 		{
-			name:        "unlimited_restarts",
+			name:        "unlimited_retries",
 			config:      NewConfig(time.Second, time.Minute, 0), // Default is unlimited
 			attempts:    100,                                    // Much higher than default
 			minExpected: time.Minute,                            // Should be capped at max backoff
@@ -173,44 +173,44 @@ func TestConfig_NextBackoff(t *testing.T) {
 	}
 }
 
-func TestWithMaxRestarts(t *testing.T) {
+func TestWithMaxRetries(t *testing.T) {
 	tests := []struct {
-		name          string
-		maxRestarts   uint
-		attempts      uint
-		expectRestart bool
+		name        string
+		maxRetries  uint
+		attempts    uint
+		expectRetry bool
 	}{
 		{
-			name:          "under_limit",
-			maxRestarts:   5,
-			attempts:      4,
-			expectRestart: true,
+			name:        "under_limit",
+			maxRetries:  5,
+			attempts:    4,
+			expectRetry: true,
 		},
 		{
-			name:          "at_limit",
-			maxRestarts:   5,
-			attempts:      5,
-			expectRestart: false,
+			name:        "at_limit",
+			maxRetries:  5,
+			attempts:    5,
+			expectRetry: false,
 		},
 		{
-			name:          "over_limit",
-			maxRestarts:   5,
-			attempts:      6,
-			expectRestart: false,
+			name:        "over_limit",
+			maxRetries:  5,
+			attempts:    6,
+			expectRetry: false,
 		},
 		{
-			name:          "zero_limit",
-			maxRestarts:   0,
-			attempts:      0,
-			expectRestart: false,
+			name:        "zero_limit",
+			maxRetries:  0,
+			attempts:    0,
+			expectRetry: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := NewConfig(time.Second, time.Minute, 0, WithMaxRestarts(tt.maxRestarts))
+			config := NewConfig(time.Second, time.Minute, 0, WithMaxRetries(tt.maxRetries))
 			_, ok := config.NextBackoff(tt.attempts)
-			assert.Equal(t, tt.expectRestart, ok)
+			assert.Equal(t, tt.expectRetry, ok)
 		})
 	}
 }

@@ -197,7 +197,7 @@ func createSqsStream(sqsClient *sqs.Client, sourceQueueURL, destQueueURL string)
 	source := Source(sqsClient, sourceConfig)
 
 	// Create transformation flow that converts message body to uppercase
-	transformFlow := flows.Map(func(msg types.Message) types.Message {
+	transformFlow := flows.Map(func(_ context.Context, msg types.Message) types.Message {
 		// Create a new message with uppercase body
 		transformedMsg := msg
 		if msg.Body != nil {

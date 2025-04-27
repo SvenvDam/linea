@@ -32,7 +32,7 @@ func TestDrain(t *testing.T) {
 
 			stream := compose.SourceThroughFlowToSink(
 				sources.Repeat(1),
-				flows.Map(func(i int) int { return i * 2 }),
+				flows.Map(func(_ context.Context, i int) int { return i * 2 }),
 				sinks.Slice[int](),
 			)
 

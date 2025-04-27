@@ -16,14 +16,14 @@ func TestTryMap(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       []int
-		mapFn       func(int) (string, error)
+		mapFn       func(context.Context, int) (string, error)
 		expected    []string
 		expectedErr error
 	}{
 		{
 			name:  "transforms all items successfully",
 			input: []int{1, 2, 3},
-			mapFn: func(i int) (string, error) {
+			mapFn: func(ctx context.Context, i int) (string, error) {
 				return strconv.Itoa(i), nil
 			},
 			expected:    []string{"1", "2", "3"},
@@ -32,7 +32,7 @@ func TestTryMap(t *testing.T) {
 		{
 			name:  "cancels on error",
 			input: []int{1, 2, 3, 4, 5},
-			mapFn: func(i int) (string, error) {
+			mapFn: func(ctx context.Context, i int) (string, error) {
 				if i == 3 {
 					return "", errors.New("error on 3")
 				}
@@ -44,7 +44,7 @@ func TestTryMap(t *testing.T) {
 		{
 			name:  "handles empty input",
 			input: []int{},
-			mapFn: func(i int) (string, error) {
+			mapFn: func(ctx context.Context, i int) (string, error) {
 				return strconv.Itoa(i), nil
 			},
 			expected:    []string{},
@@ -53,7 +53,7 @@ func TestTryMap(t *testing.T) {
 		{
 			name:  "immediate error cancels",
 			input: []int{1, 2, 3},
-			mapFn: func(i int) (string, error) {
+			mapFn: func(ctx context.Context, i int) (string, error) {
 				if i == 1 {
 					return "", errors.New("error on first item")
 				}
@@ -70,8 +70,8 @@ func TestTryMap(t *testing.T) {
 
 			mapFunc := tt.mapFn // local copy to avoid data race
 
-			mapErrFlow := TryMap(func(i int) (string, error) {
-				return mapFunc(i)
+			mapErrFlow := TryMap(func(ctx context.Context, i int) (string, error) {
+				return mapFunc(ctx, i)
 			})
 
 			stream := compose.SourceThroughFlowToSink(

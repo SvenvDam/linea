@@ -18,12 +18,12 @@ import (
 //
 // Returns a Sink that applies the side-effect to each item
 func ForEach[I any](
-	fn func(I),
+	fn func(context.Context, I),
 ) *core.Sink[I, struct{}] {
 	return core.NewSink(
 		struct{}{},
 		func(ctx context.Context, in I, acc core.Item[struct{}]) (core.Item[struct{}], core.StreamAction) {
-			fn(in)
+			fn(ctx, in)
 			return acc, core.ActionProceed
 		},
 		nil,

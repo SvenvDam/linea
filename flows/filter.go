@@ -7,24 +7,24 @@ import (
 	"github.com/svenvdam/linea/util"
 )
 
-// Filter creates a Flow that selectively passes through items based on a predicate.
-// Only items for which the predicate returns true are emitted downstream.
+// Filter creates a Flow that only allows items satisfying a predicate to pass through.
+// Items that don't match the predicate are discarded.
 //
 // Type Parameters:
 //   - I: The type of items to filter
 //
 // Parameters:
-//   - pred: Function that returns true for items that should be kept
+//   - pred: Function that returns true for items that should be emitted
 //   - opts: Optional FlowOption functions to configure the flow
 //
-// Returns a Flow that filters items based on the predicate
+// Returns a Flow that selectively emits items based on the predicate
 func Filter[I any](
-	pred func(I) bool,
+	pred func(context.Context, I) bool,
 	opts ...core.FlowOption,
 ) *core.Flow[I, I] {
 	return core.NewFlow(
 		func(ctx context.Context, elem I, out chan<- core.Item[I]) core.StreamAction {
-			if pred(elem) {
+			if pred(ctx, elem) {
 				util.Send(ctx, core.Item[I]{Value: elem}, out)
 			}
 			return core.ActionProceed

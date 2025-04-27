@@ -1,6 +1,8 @@
 package flows
 
 import (
+	"context"
+
 	"github.com/svenvdam/linea/core"
 )
 
@@ -17,10 +19,10 @@ import (
 //
 // Returns a Flow that transforms items using the mapping function
 func Map[I, O any](
-	fn func(I) O,
+	fn func(context.Context, I) O,
 	opts ...core.FlowOption,
 ) *core.Flow[I, O] {
-	return TryMap(func(i I) (O, error) {
-		return fn(i), nil
+	return TryMap(func(ctx context.Context, i I) (O, error) {
+		return fn(ctx, i), nil
 	}, opts...)
 }
